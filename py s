@@ -1,0 +1,479 @@
+import socket
+import threading
+import json
+import time
+import random
+
+HOST = "0.0.0.0"
+PORT = 5555
+TICK_RATE = 12
+STEP = 20
+
+AUTO_START_WITH_ONE_PLAYER = True
+USE_AI_IF_NO_SECOND_PLAYER = True
+WAIT_SECONDS_BEFORE_START = 3
+
+lock = threading.Lock()
+clients = {}
+client_sockets = {}
+running = True
+
+food = {"x": 0, "y": 0}
+game_started = False
+first_player_join_time = None
+ai_enabled = False
+
+
+def random_grid_position():
+    x = random.randint(-320, 320)
+    y = random.randint(-320, 320)
+    x = round(x / STEP) * STEP
+    y = round(y / STEP) * STEP
+    return x, y
+
+
+def reset_food():
+    global food
+    x, y = random_grid_position()
+    food = {"x": x, "y": y}
+
+
+def make_player(pid, x, y, direction, name, is_ai=False):
+    return {
+        "id": pid,
+        "x": x,
+        "y": y,
+        "dir": direction,
+        "body": [],
+        "score": 0,
+        "alive": True,
+        "name": name,
+        "is_ai": is_ai,
+    }
+
+
+def reset_game():
+    global clients, game_started, ai_enabled, first_player_join_time
+    with lock:
+        clients = {
+            1: make_player(1, -100, 0, "RIGHT", "Jugador 1", False),
+            2: make_player(2, 100, 0, "LEFT", "Jugador 2", False),
+        }
+        reset_food()
+        game_started = False
+        ai_enabled = False
+        first_player_join_time = None
+
+
+def activate_ai():
+    global ai_enabled
+    if 2 not in client_sockets:
+        clients[2] = make_player(2, 100, 0, "LEFT", "IA", True)
+        ai_enabled = True
+
+
+def deactivate_ai():
+    global ai_enabled
+    if 2 in clients and clients[2].get("is_ai"):
+        clients[2] = make_player(2, 100, 0, "LEFT", "Jugador 2", False)
+    ai_enabled = False
+
+
+def move_player(player):
+    old_head = (player["x"], player["y"])
+
+    if player["dir"] == "UP":
+        player["y"] += STEP
+    elif player["dir"] == "DOWN":
+        player["y"] -= STEP
+    elif player["dir"] == "LEFT":
+        player["x"] -= STEP
+    elif player["dir"] == "RIGHT":
+        player["x"] += STEP
+
+    if player["body"]:
+        player["body"].insert(0, old_head)
+        player["body"].pop()
+
+
+def grow_player(player):
+    if player["body"]:
+        player["body"].append(player["body"][-1])
+    else:
+        player["body"].append((player["x"], player["y"]))
+
+
+def out_of_bounds(player):
+    return (
+        player["x"] > 330 or player["x"] < -330 or
+        player["y"] > 330 or player["y"] < -330
+    )
+
+
+def collide_with_body(player, body):
+    return (player["x"], player["y"]) in body
+
+
+def head_collision(p1, p2):
+    return p1["x"] == p2["x"] and p1["y"] == p2["y"]
+
+
+def food_collision(player):
+    return abs(player["x"] - food["x"]) < 10 and abs(player["y"] - food["y"]) < 10
+
+
+def valid_direction_change(current_dir, new_dir):
+    opposite = {
+        "UP": "DOWN",
+        "DOWN": "UP",
+        "LEFT": "RIGHT",
+        "RIGHT": "LEFT",
+    }
+    return opposite[current_dir] != new_dir
+
+
+def ai_choose_direction(player):
+    options = []
+
+    if food["x"] > player["x"]:
+        options.append("RIGHT")
+    elif food["x"] < player["x"]:
+        options.append("LEFT")
+
+    if food["y"] > player["y"]:
+        options.append("UP")
+    elif food["y"] < player["y"]:
+        options.append("DOWN")
+
+    for d in ["UP", "DOWN", "LEFT", "RIGHT"]:
+        if d not in options:
+            options.append(d)
+
+    for new_dir in options:
+        if not valid_direction_change(player["dir"], new_dir):
+            continue
+
+        nx, ny = player["x"], player["y"]
+        if new_dir == "UP":
+            ny += STEP
+        elif new_dir == "DOWN":
+            ny -= STEP
+        elif new_dir == "LEFT":
+            nx -= STEP
+        elif new_dir == "RIGHT":
+            nx += STEP
+
+        if nx > 330 or nx < -330 or ny > 330 or ny < -330:
+            continue
+
+        if (nx, ny) in player["body"]:
+            continue
+
+        p1 = clients.get(1)
+        if p1 and p1["alive"]:
+            if (nx, ny) in p1["body"]:
+                continue
+            if p1["x"] == nx and p1["y"] == ny:
+                continue
+
+        return new_dir
+
+    return player["dir"]
+
+
+def serialize_state():
+    return {
+        "type": "state",
+        "players": {
+            str(pid): {
+                "id": p["id"],
+                "x": p["x"],
+                "y": p["y"],
+                "dir": p["dir"],
+                "body": p["body"],
+                "score": p["score"],
+                "alive": p["alive"],
+                "name": p["name"],
+                "is_ai": p.get("is_ai", False),
+            }
+            for pid, p in clients.items()
+        },
+        "food": food,
+        "game_started": game_started,
+        "ai_enabled": ai_enabled,
+    }
+
+
+def send_json(conn, data):
+    msg = json.dumps(data) + "\n"
+    conn.sendall(msg.encode("utf-8"))
+
+
+def broadcast_state():
+    data = serialize_state()
+    dead = []
+
+    for pid, conn in list(client_sockets.items()):
+        try:
+            send_json(conn, data)
+        except:
+            dead.append(pid)
+
+    for pid in dead:
+        try:
+            client_sockets[pid].close()
+        except:
+            pass
+        client_sockets.pop(pid, None)
+
+
+def maybe_start_game():
+    global game_started, first_player_join_time
+
+    real_players = len(client_sockets)
+
+    if real_players == 2:
+        deactivate_ai()
+        game_started = True
+        return
+
+    if real_players == 1 and AUTO_START_WITH_ONE_PLAYER:
+        if first_player_join_time is None:
+            first_player_join_time = time.time()
+
+        if time.time() - first_player_join_time >= WAIT_SECONDS_BEFORE_START:
+            if USE_AI_IF_NO_SECOND_PLAYER:
+                activate_ai()
+            game_started = True
+    else:
+        game_started = False
+
+
+def handle_client(conn, addr, player_id):
+    global game_started, first_player_join_time
+
+    print(f"Jugador {player_id} conectado desde {addr}")
+
+    try:
+        send_json(conn, {
+            "type": "welcome",
+            "player_id": player_id,
+            "message": f"Conectado como Jugador {player_id}"
+        })
+
+        buffer = ""
+
+        while running:
+            data = conn.recv(4096)
+            if not data:
+                break
+
+            buffer += data.decode("utf-8")
+
+            while "\n" in buffer:
+                line, buffer = buffer.split("\n", 1)
+                line = line.strip()
+                if not line:
+                    continue
+
+                try:
+                    msg = json.loads(line)
+                except:
+                    continue
+
+                with lock:
+                    if player_id not in clients:
+                        continue
+
+                    player = clients[player_id]
+
+                    if msg.get("type") == "join":
+                        name = msg.get("name", f"Jugador {player_id}")[:20]
+                        player["name"] = name
+                        if first_player_join_time is None:
+                            first_player_join_time = time.time()
+
+                    elif msg.get("type") == "dir":
+                        new_dir = msg.get("dir")
+                        if new_dir in ("UP", "DOWN", "LEFT", "RIGHT"):
+                            if valid_direction_change(player["dir"], new_dir):
+                                player["dir"] = new_dir
+
+                    elif msg.get("type") == "restart":
+                        reset_game()
+                        for pid in list(client_sockets.keys()):
+                            if pid in clients:
+                                clients[pid]["name"] = f"Jugador {pid}"
+                        if len(client_sockets) >= 1:
+                            first_player_join_time = time.time()
+
+    except Exception as e:
+        print(f"Error con jugador {player_id}: {e}")
+
+    finally:
+        print(f"Jugador {player_id} desconectado")
+        with lock:
+            client_sockets.pop(player_id, None)
+            if player_id in clients:
+                clients[player_id]["alive"] = False
+
+            if player_id == 2 and ai_enabled:
+                deactivate_ai()
+
+            if len(client_sockets) == 0:
+                reset_game()
+            elif len(client_sockets) == 1:
+                first_player_join_time = time.time()
+                game_started = False
+
+        try:
+            conn.close()
+        except:
+            pass
+
+
+def update_single_player_mode():
+    p1 = clients.get(1)
+    p2 = clients.get(2)
+
+    if not p1 or not p1["alive"]:
+        return
+
+    if p2 and p2["alive"]:
+        if p2.get("is_ai"):
+            p2["dir"] = ai_choose_direction(p2)
+            move_player(p2)
+
+            if out_of_bounds(p2) or collide_with_body(p2, p2["body"]) or collide_with_body(p2, p1["body"]):
+                p2["alive"] = False
+
+            if p2["alive"] and head_collision(p1, p2):
+                p1["alive"] = False
+                p2["alive"] = False
+
+            if p2["alive"] and food_collision(p2):
+                p2["score"] += 1
+                grow_player(p2)
+                reset_food()
+
+    move_player(p1)
+
+    if out_of_bounds(p1) or collide_with_body(p1, p1["body"]):
+        p1["alive"] = False
+
+    if p2 and p2["alive"] and collide_with_body(p1, p2["body"]):
+        p1["alive"] = False
+
+    if p1["alive"] and food_collision(p1):
+        p1["score"] += 1
+        grow_player(p1)
+        reset_food()
+
+
+def update_two_player_mode():
+    p1 = clients.get(1)
+    p2 = clients.get(2)
+
+    if not p1 or not p2:
+        return
+    if not p1["alive"] or not p2["alive"]:
+        return
+
+    move_player(p1)
+
+    if p2.get("is_ai"):
+        p2["dir"] = ai_choose_direction(p2)
+
+    move_player(p2)
+
+    if out_of_bounds(p1):
+        p1["alive"] = False
+    if out_of_bounds(p2):
+        p2["alive"] = False
+
+    if p1["alive"] and collide_with_body(p1, p1["body"]):
+        p1["alive"] = False
+    if p2["alive"] and collide_with_body(p2, p2["body"]):
+        p2["alive"] = False
+
+    if p1["alive"] and collide_with_body(p1, p2["body"]):
+        p1["alive"] = False
+    if p2["alive"] and collide_with_body(p2, p1["body"]):
+        p2["alive"] = False
+
+    if p1["alive"] and p2["alive"] and head_collision(p1, p2):
+        p1["alive"] = False
+        p2["alive"] = False
+
+    if p1["alive"] and food_collision(p1):
+        p1["score"] += 1
+        grow_player(p1)
+        reset_food()
+
+    if p2["alive"] and food_collision(p2):
+        p2["score"] += 1
+        grow_player(p2)
+        reset_food()
+
+
+def game_loop():
+    while running:
+        time.sleep(1 / TICK_RATE)
+
+        with lock:
+            maybe_start_game()
+
+            if not game_started:
+                broadcast_state()
+                continue
+
+            real_players = len(client_sockets)
+
+            if real_players == 1:
+                update_single_player_mode()
+            else:
+                update_two_player_mode()
+
+            broadcast_state()
+
+
+def accept_loop():
+    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server.bind((HOST, PORT))
+    server.listen(2)
+
+    print(f"Servidor iniciado en {HOST}:{PORT}")
+    print("Esperando jugadores...")
+
+    while running:
+        conn, addr = server.accept()
+
+        with lock:
+            if 1 not in client_sockets:
+                player_id = 1
+            elif 2 not in client_sockets:
+                player_id = 2
+                deactivate_ai()
+            else:
+                send_json(conn, {
+                    "type": "error",
+                    "message": "Servidor lleno"
+                })
+                conn.close()
+                continue
+
+            client_sockets[player_id] = conn
+            clients[player_id]["alive"] = True
+
+        thread = threading.Thread(
+            target=handle_client,
+            args=(conn, addr, player_id),
+            daemon=True
+        )
+        thread.start()
+
+
+if __name__ == "__main__":
+    reset_game()
+    threading.Thread(target=game_loop, daemon=True).start()
+    accept_loop()

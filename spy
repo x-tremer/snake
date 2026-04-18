@@ -1,0 +1,711 @@
+import turtle
+import random
+import time
+import os
+
+# =========================
+# CONFIGURACIÓN
+# =========================
+ANCHO = 700
+ALTO = 700
+MOVIMIENTO = 20
+DELAY_INICIAL = 0.12
+ARCHIVO_RECORD = "record.txt"
+
+# Estados: menu, jugando1, jugando2, pausa, gameover1, gameover2, online
+estado = "menu"
+modo = 1
+delay = DELAY_INICIAL
+record = 0
+nivel = 1
+skin_actual = 0
+mapa_actual = 0
+comida_actual = 0
+ganador = ""
+
+skins = [
+    {"nombre": "Clásica", "cabeza": "lime", "cuerpo": "green"},
+    {"nombre": "Azul", "cabeza": "deepskyblue", "cuerpo": "blue"},
+    {"nombre": "Fuego", "cabeza": "orange", "cuerpo": "red"},
+    {"nombre": "Morada", "cabeza": "violet", "cuerpo": "purple"},
+]
+
+mapas = [
+    {"nombre": "Clásico"},
+    {"nombre": "Columnas"},
+    {"nombre": "Cruz"},
+    {"nombre": "Fortaleza"},
+]
+
+comidas = [
+    {"nombre": "Manzana", "color": "red", "hoja": "green", "puntos": 1},
+    {"nombre": "Banana", "color": "yellow", "hoja": "gold", "puntos": 2},
+    {"nombre": "Uva", "color": "purple", "hoja": "violet", "puntos": 3},
+]
+
+segmentos1 = []
+segmentos2 = []
+obstaculos = []
+particulas = []
+
+puntaje1 = 0
+puntaje2 = 0
+
+# =========================
+# RECORD
+# =========================
+def cargar_record():
+    global record
+    if os.path.exists(ARCHIVO_RECORD):
+        try:
+            with open(ARCHIVO_RECORD, "r", encoding="utf-8") as f:
+                record = int(f.read().strip())
+        except:
+            record = 0
+    else:
+        record = 0
+
+def guardar_record():
+    try:
+        with open(ARCHIVO_RECORD, "w", encoding="utf-8") as f:
+            f.write(str(record))
+    except:
+        pass
+
+# =========================
+# VENTANA
+# =========================
+wn = turtle.Screen()
+wn.title("Snake 1P / 2P - mapas y comidas")
+wn.bgcolor("black")
+wn.setup(width=ANCHO, height=ALTO)
+wn.tracer(0)
+
+# =========================
+# FONDO ANIMADO
+# =========================
+for _ in range(30):
+    p = turtle.Turtle()
+    p.speed(0)
+    p.shape("circle")
+    p.color("midnight blue")
+    p.penup()
+    p.shapesize(0.2, 0.2)
+    p.goto(random.randint(-340, 340), random.randint(-340, 340))
+    particulas.append(p)
+
+# =========================
+# JUGADOR 1
+# =========================
+cabeza1 = turtle.Turtle()
+cabeza1.speed(0)
+cabeza1.shape("square")
+cabeza1.color(skins[skin_actual]["cabeza"])
+cabeza1.penup()
+cabeza1.goto(-100, 0)
+cabeza1.direction = "stop"
+cabeza1.hideturtle()
+
+# =========================
+# JUGADOR 2
+# =========================
+cabeza2 = turtle.Turtle()
+cabeza2.speed(0)
+cabeza2.shape("square")
+cabeza2.color("cyan")
+cabeza2.penup()
+cabeza2.goto(100, 0)
+cabeza2.direction = "stop"
+cabeza2.hideturtle()
+
+# =========================
+# COMIDA
+# =========================
+comida = turtle.Turtle()
+comida.speed(0)
+comida.shape("circle")
+comida.color(comidas[comida_actual]["color"])
+comida.penup()
+comida.goto(0, 100)
+comida.hideturtle()
+
+hoja = turtle.Turtle()
+hoja.speed(0)
+hoja.shape("circle")
+hoja.color(comidas[comida_actual]["hoja"])
+hoja.penup()
+hoja.shapesize(0.3, 0.3)
+hoja.goto(8, 112)
+hoja.hideturtle()
+
+# =========================
+# TEXTO
+# =========================
+lapiz = turtle.Turtle()
+lapiz.speed(0)
+lapiz.color("white")
+lapiz.penup()
+lapiz.hideturtle()
+
+mensaje = turtle.Turtle()
+mensaje.speed(0)
+mensaje.color("white")
+mensaje.penup()
+mensaje.hideturtle()
+
+# =========================
+# UTILIDADES
+# =========================
+def dibujar_texto_centrado(t, y, tam=18, color="white"):
+    mensaje.color(color)
+    mensaje.goto(0, y)
+    mensaje.write(t, align="center", font=("Arial", tam, "bold"))
+
+def actualizar_marcador():
+    lapiz.clear()
+    lapiz.goto(0, 320)
+    if modo == 1:
+        lapiz.write(
+            f"Puntaje: {puntaje1}   Récord: {record}   Nivel: {nivel}   "
+            f"Skin: {skins[skin_actual]['nombre']}   "
+            f"Mapa: {mapas[mapa_actual]['nombre']}   "
+            f"Comida: {comidas[comida_actual]['nombre']}",
+            align="center",
+            font=("Arial", 12, "bold")
+        )
+    else:
+        lapiz.write(
+            f"J1: {puntaje1}   J2: {puntaje2}   Récord: {record}   Nivel: {nivel}   "
+            f"Mapa: {mapas[mapa_actual]['nombre']}   Comida: {comidas[comida_actual]['nombre']}",
+            align="center",
+            font=("Arial", 12, "bold")
+        )
+
+def mostrar_menu():
+    mensaje.clear()
+    dibujar_texto_centrado("SNAKE", 210, 30, "white")
+    dibujar_texto_centrado("1 = Un jugador", 140, 16)
+    dibujar_texto_centrado("2 = Dos jugadores", 110, 16)
+    dibujar_texto_centrado("O = Online (próximamente)", 80, 16, "cyan")
+    dibujar_texto_centrado("K = Cambiar skin", 40, 16)
+    dibujar_texto_centrado("J = Cambiar mapa", 10, 16)
+    dibujar_texto_centrado("C = Cambiar comida", -20, 16)
+    dibujar_texto_centrado("P = Pausa", -50, 16)
+    dibujar_texto_centrado("Q = Salir", -80, 16)
+
+    dibujar_texto_centrado("Controles J1: Flechas", -150, 14, "lime")
+    dibujar_texto_centrado("Controles J2: W A S D", -180, 14, "cyan")
+
+    dibujar_texto_centrado(f"Récord actual: {record}", -240, 16, "yellow")
+    dibujar_texto_centrado(f"Skin: {skins[skin_actual]['nombre']}", -270, 16, "violet")
+    dibujar_texto_centrado(f"Mapa: {mapas[mapa_actual]['nombre']}", -300, 16, "orange")
+    dibujar_texto_centrado(
+        f"Comida: {comidas[comida_actual]['nombre']} (+{comidas[comida_actual]['puntos']})",
+        -330, 16, comidas[comida_actual]["color"]
+    )
+
+def mostrar_online():
+    mensaje.clear()
+    dibujar_texto_centrado("MODO ONLINE", 60, 28, "cyan")
+    dibujar_texto_centrado("Próximamente", 20, 18, "white")
+    dibujar_texto_centrado("Para hacerlo real hace falta servidor o sockets", -20, 14, "gray")
+    dibujar_texto_centrado("Pulsa M para volver al menú", -60, 16, "white")
+
+def ocultar_mensajes():
+    mensaje.clear()
+
+def actualizar_comida_visual():
+    comida.color(comidas[comida_actual]["color"])
+    hoja.color(comidas[comida_actual]["hoja"])
+
+def mostrar_objetos_juego():
+    cabeza1.showturtle()
+    if modo == 2:
+        cabeza2.showturtle()
+    comida.showturtle()
+    hoja.showturtle()
+
+def ocultar_objetos_juego():
+    cabeza1.hideturtle()
+    cabeza2.hideturtle()
+    comida.hideturtle()
+    hoja.hideturtle()
+    for s in segmentos1:
+        s.hideturtle()
+    for s in segmentos2:
+        s.hideturtle()
+    for o in obstaculos:
+        o.hideturtle()
+
+def mostrar_segmentos_y_obstaculos():
+    for s in segmentos1:
+        s.showturtle()
+    for s in segmentos2:
+        s.showturtle()
+    for o in obstaculos:
+        o.showturtle()
+
+def posicion_libre():
+    while True:
+        x = random.randint(-320, 320)
+        y = random.randint(-320, 320)
+        x = round(x / 20) * 20
+        y = round(y / 20) * 20
+
+        ocupadas = [(cabeza1.xcor(), cabeza1.ycor()), (cabeza2.xcor(), cabeza2.ycor())]
+        ocupadas += [(s.xcor(), s.ycor()) for s in segmentos1]
+        ocupadas += [(s.xcor(), s.ycor()) for s in segmentos2]
+        ocupadas += [(o.xcor(), o.ycor()) for o in obstaculos]
+
+        if (x, y) not in ocupadas:
+            return x, y
+
+def colocar_comida():
+    x, y = posicion_libre()
+    comida.goto(x, y)
+    hoja.goto(x + 8, y + 12)
+
+def crear_obstaculos():
+    global obstaculos
+
+    for o in obstaculos:
+        o.goto(1000, 1000)
+        o.hideturtle()
+    obstaculos.clear()
+
+    posiciones = []
+    nombre_mapa = mapas[mapa_actual]["nombre"]
+
+    if nombre_mapa == "Clásico":
+        posiciones = []
+
+    elif nombre_mapa == "Columnas":
+        for y in range(-120, 140, 20):
+            posiciones.append((-140, y))
+            posiciones.append((140, y))
+
+    elif nombre_mapa == "Cruz":
+        for x in range(-140, 160, 20):
+            posiciones.append((x, 0))
+        for y in range(-140, 160, 20):
+            posiciones.append((0, y))
+
+    elif nombre_mapa == "Fortaleza":
+        for x in range(-220, 240, 20):
+            if x not in (-20, 0, 20):
+                posiciones.append((x, -180))
+                posiciones.append((x, 180))
+        for y in range(-140, 160, 20):
+            posiciones.append((-220, y))
+            posiciones.append((220, y))
+
+    if nivel >= 3 and nombre_mapa != "Clásico":
+        for x in range(-80, 100, 20):
+            if x != 0:
+                posiciones.append((x, 120))
+                posiciones.append((x, -120))
+
+    for pos in posiciones:
+        o = turtle.Turtle()
+        o.speed(0)
+        o.shape("square")
+        o.color("gray")
+        o.penup()
+        o.goto(pos)
+        o.hideturtle()
+        obstaculos.append(o)
+
+def crear_segmento(color):
+    s = turtle.Turtle()
+    s.speed(0)
+    s.shape("square")
+    s.color(color)
+    s.penup()
+    s.hideturtle()
+    return s
+
+def actualizar_skin():
+    cabeza1.color(skins[skin_actual]["cabeza"])
+    for s in segmentos1:
+        s.color(skins[skin_actual]["cuerpo"])
+
+def reiniciar_juego(nuevo_modo):
+    global estado, modo, delay, nivel, puntaje1, puntaje2, ganador
+
+    modo = nuevo_modo
+    delay = DELAY_INICIAL
+    nivel = 1
+    puntaje1 = 0
+    puntaje2 = 0
+    ganador = ""
+
+    cabeza1.goto(-100, 0)
+    cabeza1.direction = "stop"
+
+    cabeza2.goto(100, 0)
+    cabeza2.direction = "stop"
+
+    if modo == 2:
+        estado = "jugando2"
+    else:
+        estado = "jugando1"
+
+    for s in segmentos1:
+        s.goto(1000, 1000)
+        s.hideturtle()
+    for s in segmentos2:
+        s.goto(1000, 1000)
+        s.hideturtle()
+
+    segmentos1.clear()
+    segmentos2.clear()
+
+    crear_obstaculos()
+    actualizar_skin()
+    actualizar_comida_visual()
+    colocar_comida()
+
+    mostrar_objetos_juego()
+    mostrar_segmentos_y_obstaculos()
+
+    actualizar_marcador()
+    ocultar_mensajes()
+
+def subir_nivel():
+    global nivel, delay
+    total = puntaje1 + puntaje2 if modo == 2 else puntaje1
+    nuevo_nivel = total // 8 + 1
+    if nuevo_nivel != nivel:
+        nivel = nuevo_nivel
+        delay = max(0.05, DELAY_INICIAL - (nivel - 1) * 0.01)
+        crear_obstaculos()
+        colocar_comida()
+        mostrar_segmentos_y_obstaculos()
+
+def mostrar_pausa():
+    mensaje.clear()
+    dibujar_texto_centrado("PAUSA", 20, 28, "yellow")
+    dibujar_texto_centrado("Pulsa P para continuar", -20, 16, "white")
+
+def mostrar_game_over():
+    mensaje.clear()
+    if modo == 1:
+        dibujar_texto_centrado("GAME OVER", 40, 28, "red")
+        dibujar_texto_centrado("ENTER = volver a jugar 1P", 0, 16)
+        dibujar_texto_centrado("M = menú", -30, 16)
+    else:
+        dibujar_texto_centrado("FIN DE PARTIDA", 60, 28, "red")
+        dibujar_texto_centrado(ganador, 20, 18, "yellow")
+        dibujar_texto_centrado("1 = jugar 1P", -20, 16)
+        dibujar_texto_centrado("2 = jugar 2P", -50, 16)
+        dibujar_texto_centrado("M = menú", -80, 16)
+
+def ir_menu():
+    global estado
+    estado = "menu"
+
+    cabeza1.goto(-100, 0)
+    cabeza1.direction = "stop"
+
+    cabeza2.goto(100, 0)
+    cabeza2.direction = "stop"
+
+    for s in segmentos1:
+        s.goto(1000, 1000)
+        s.hideturtle()
+    for s in segmentos2:
+        s.goto(1000, 1000)
+        s.hideturtle()
+
+    segmentos1.clear()
+    segmentos2.clear()
+
+    for o in obstaculos:
+        o.goto(1000, 1000)
+        o.hideturtle()
+    obstaculos.clear()
+
+    ocultar_objetos_juego()
+    actualizar_skin()
+    actualizar_comida_visual()
+    actualizar_marcador()
+    mostrar_menu()
+
+def salir():
+    wn.bye()
+
+# =========================
+# MOVIMIENTO
+# =========================
+def mover_serpiente(cabeza):
+    x = cabeza.xcor()
+    y = cabeza.ycor()
+
+    if cabeza.direction == "Up":
+        cabeza.sety(y + MOVIMIENTO)
+    elif cabeza.direction == "Down":
+        cabeza.sety(y - MOVIMIENTO)
+    elif cabeza.direction == "Left":
+        cabeza.setx(x - MOVIMIENTO)
+    elif cabeza.direction == "Right":
+        cabeza.setx(x + MOVIMIENTO)
+
+def mover_segmentos(cabeza, segmentos):
+    for i in range(len(segmentos) - 1, 0, -1):
+        x = segmentos[i - 1].xcor()
+        y = segmentos[i - 1].ycor()
+        segmentos[i].goto(x, y)
+
+    if len(segmentos) > 0:
+        segmentos[0].goto(cabeza.xcor(), cabeza.ycor())
+
+# =========================
+# CONTROLES J1
+# =========================
+def arriba():
+    if estado in ("jugando1", "jugando2") and cabeza1.direction != "Down":
+        cabeza1.direction = "Up"
+
+def abajo():
+    if estado in ("jugando1", "jugando2") and cabeza1.direction != "Up":
+        cabeza1.direction = "Down"
+
+def izquierda():
+    if estado in ("jugando1", "jugando2") and cabeza1.direction != "Right":
+        cabeza1.direction = "Left"
+
+def derecha():
+    if estado in ("jugando1", "jugando2") and cabeza1.direction != "Left":
+        cabeza1.direction = "Right"
+
+# =========================
+# CONTROLES J2
+# =========================
+def w():
+    if estado == "jugando2" and cabeza2.direction != "Down":
+        cabeza2.direction = "Up"
+
+def s():
+    if estado == "jugando2" and cabeza2.direction != "Up":
+        cabeza2.direction = "Down"
+
+def a():
+    if estado == "jugando2" and cabeza2.direction != "Right":
+        cabeza2.direction = "Left"
+
+def d():
+    if estado == "jugando2" and cabeza2.direction != "Left":
+        cabeza2.direction = "Right"
+
+# =========================
+# MENÚ Y OPCIONES
+# =========================
+def pausar():
+    global estado
+    if estado in ("jugando1", "jugando2"):
+        estado = "pausa"
+        mostrar_pausa()
+    elif estado == "pausa":
+        estado = "jugando2" if modo == 2 else "jugando1"
+        ocultar_mensajes()
+
+def cambiar_skin():
+    global skin_actual
+    if estado == "menu":
+        skin_actual = (skin_actual + 1) % len(skins)
+        actualizar_skin()
+        mostrar_menu()
+
+def cambiar_mapa():
+    global mapa_actual
+    if estado == "menu":
+        mapa_actual = (mapa_actual + 1) % len(mapas)
+        mostrar_menu()
+
+def cambiar_comida():
+    global comida_actual
+    if estado == "menu":
+        comida_actual = (comida_actual + 1) % len(comidas)
+        actualizar_comida_visual()
+        mostrar_menu()
+
+def abrir_online():
+    global estado
+    if estado == "menu":
+        estado = "online"
+        ocultar_objetos_juego()
+        mostrar_online()
+
+def iniciar_1p():
+    reiniciar_juego(1)
+
+def iniciar_2p():
+    reiniciar_juego(2)
+
+# =========================
+# COLISIONES
+# =========================
+def toca_borde(cabeza):
+    return cabeza.xcor() > 330 or cabeza.xcor() < -330 or cabeza.ycor() > 330 or cabeza.ycor() < -330
+
+def toca_obstaculo(cabeza):
+    for o in obstaculos:
+        if o.distance(cabeza) < 10:
+            return True
+    return False
+
+def toca_cuerpo(cabeza, segmentos):
+    for s in segmentos:
+        if s.distance(cabeza) < 10:
+            return True
+    return False
+
+def terminar_1p():
+    global estado, record
+    estado = "gameover1"
+    if puntaje1 > record:
+        record = puntaje1
+        guardar_record()
+    actualizar_marcador()
+    mostrar_game_over()
+
+def terminar_2p(texto_ganador):
+    global estado, record, ganador
+    estado = "gameover2"
+    ganador = texto_ganador
+    mejor = max(puntaje1, puntaje2)
+    if mejor > record:
+        record = mejor
+        guardar_record()
+    actualizar_marcador()
+    mostrar_game_over()
+
+def sumar_puntos_j1():
+    global puntaje1, record
+    puntos = comidas[comida_actual]["puntos"]
+    puntaje1 += puntos
+    if puntaje1 > record:
+        record = puntaje1
+
+def sumar_puntos_j2():
+    global puntaje2, record
+    puntos = comidas[comida_actual]["puntos"]
+    puntaje2 += puntos
+    if puntaje2 > record:
+        record = puntaje2
+
+# =========================
+# TECLAS
+# =========================
+wn.listen()
+wn.onkeypress(arriba, "Up")
+wn.onkeypress(abajo, "Down")
+wn.onkeypress(izquierda, "Left")
+wn.onkeypress(derecha, "Right")
+
+wn.onkeypress(w, "w")
+wn.onkeypress(s, "s")
+wn.onkeypress(a, "a")
+wn.onkeypress(d, "d")
+
+wn.onkeypress(pausar, "p")
+wn.onkeypress(cambiar_skin, "k")
+wn.onkeypress(cambiar_mapa, "j")
+wn.onkeypress(cambiar_comida, "c")
+wn.onkeypress(abrir_online, "o")
+wn.onkeypress(iniciar_1p, "1")
+wn.onkeypress(iniciar_2p, "2")
+wn.onkeypress(iniciar_1p, "Return")
+wn.onkeypress(ir_menu, "m")
+wn.onkeypress(salir, "q")
+
+# =========================
+# INICIO
+# =========================
+cargar_record()
+actualizar_skin()
+actualizar_comida_visual()
+actualizar_marcador()
+ocultar_objetos_juego()
+mostrar_menu()
+
+# =========================
+# LOOP PRINCIPAL
+# =========================
+while True:
+    wn.update()
+
+    for p in particulas:
+        y = p.ycor() + 0.35
+        if y > 350:
+            p.goto(random.randint(-340, 340), -350)
+        else:
+            p.sety(y)
+
+    if estado == "jugando1":
+        mostrar_segmentos_y_obstaculos()
+        mover_segmentos(cabeza1, segmentos1)
+        mover_serpiente(cabeza1)
+
+        if toca_borde(cabeza1) or toca_obstaculo(cabeza1) or toca_cuerpo(cabeza1, segmentos1):
+            terminar_1p()
+
+        if cabeza1.distance(comida) < 15:
+            colocar_comida()
+            nuevo = crear_segmento(skins[skin_actual]["cuerpo"])
+            nuevo.showturtle()
+            segmentos1.append(nuevo)
+            sumar_puntos_j1()
+            subir_nivel()
+            actualizar_marcador()
+
+    elif estado == "jugando2":
+        mostrar_segmentos_y_obstaculos()
+        mover_segmentos(cabeza1, segmentos1)
+        mover_segmentos(cabeza2, segmentos2)
+
+        mover_serpiente(cabeza1)
+        mover_serpiente(cabeza2)
+
+        j1_pierde = (
+            toca_borde(cabeza1) or
+            toca_obstaculo(cabeza1) or
+            toca_cuerpo(cabeza1, segmentos1) or
+            toca_cuerpo(cabeza1, segmentos2) or
+            cabeza1.distance(cabeza2) < 10
+        )
+
+        j2_pierde = (
+            toca_borde(cabeza2) or
+            toca_obstaculo(cabeza2) or
+            toca_cuerpo(cabeza2, segmentos2) or
+            toca_cuerpo(cabeza2, segmentos1) or
+            cabeza2.distance(cabeza1) < 10
+        )
+
+        if j1_pierde and j2_pierde:
+            terminar_2p("Empate")
+        elif j1_pierde:
+            terminar_2p("Gana Jugador 2")
+        elif j2_pierde:
+            terminar_2p("Gana Jugador 1")
+
+        if estado == "jugando2":
+            if cabeza1.distance(comida) < 15:
+                colocar_comida()
+                nuevo = crear_segmento(skins[skin_actual]["cuerpo"])
+                nuevo.showturtle()
+                segmentos1.append(nuevo)
+                sumar_puntos_j1()
+                subir_nivel()
+                actualizar_marcador()
+            elif cabeza2.distance(comida) < 15:
+                colocar_comida()
+                nuevo = crear_segmento("cyan")
+                nuevo.showturtle()
+                segmentos2.append(nuevo)
+                sumar_puntos_j2()
+                subir_nivel()
+                actualizar_marcador()
+
+    time.sleep(delay if estado in ("jugando1", "jugando2") else 0.03)

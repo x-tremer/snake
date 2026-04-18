@@ -1,0 +1,386 @@
+import turtle
+import random
+import time
+
+# CONFIG
+ANCHO = 600
+ALTO = 600
+MOVE = 20
+estado = "menu"
+modo = "solo"  # solo / multi
+delay = 0.12
+
+# VENTANA
+wn = turtle.Screen()
+wn.title("Snake Completo")
+wn.bgcolor("black")
+wn.setup(width=ANCHO, height=ALTO)
+wn.tracer(0)
+
+# TEXTO
+texto = turtle.Turtle()
+texto.hideturtle()
+texto.penup()
+texto.color("white")
+
+def draw_text(msg, y):
+    texto.goto(0, y)
+    texto.write(msg, align="center", font=("Arial", 18, "bold"))
+
+def menu():
+    texto.clear()
+    draw_text("SNAKE", 120)
+    draw_text("1 = Solo (vs IA)", 60)
+    draw_text("2 = 2 Jugadores", 20)
+    draw_text("Q = Salir", -20)
+
+# JUGADORES
+def crear_cabeza(color, x):
+    t = turtle.Turtle()
+    t.shape("square")
+    t.color(color)
+    t.penup()
+    t.goto(x, 0)
+    t.direction = "stop"
+    return t
+
+p1 = crear_cabeza("lime", -100)
+p2 = crear_cabeza("cyan", 100)
+
+seg1 = []
+seg2 = []
+
+# COMIDA
+food = turtle.Turtle()
+food.shape("circle")
+food.color("red")
+food.penup()
+food.goto(0, 100)
+
+# CONTROLES
+def up1(): 
+    if p1.direction != "down": p1.direction = "up"
+def down1(): 
+    if p1.direction != "up": p1.direction = "down"
+def left1(): 
+    if p1.direction != "right": p1.direction = "left"
+def right1(): 
+    if p1.direction != "left": p1.direction = "right"
+
+def up2(): 
+    if p2.direction != "down": p2.direction = "up"
+def down2(): 
+    if p2.direction != "up": p2.direction = "down"
+def left2(): 
+    if p2.direction != "right": p2.direction = "left"
+def right2(): 
+    if p2.direction != "left": p2.direction = "right"
+
+wn.listen()
+wn.onkeypress(up1, "Up")
+wn.onkeypress(down1, "Down")
+wn.onkeypress(left1, "Left")
+wn.onkeypress(right1, "Right")
+
+wn.onkeypress(up2, "w")
+wn.onkeypress(down2, "s")
+wn.onkeypress(left2, "a")
+wn.onkeypress(right2, "d")
+
+def start_solo():
+    global estado, modo
+    estado = "game"
+    modo = "solo"
+    reset()
+
+def start_multi():
+    global estado, modo
+    estado = "game"
+    modo = "multi"
+    reset()
+
+wn.onkeypress(start_solo, "1")
+wn.onkeypress(start_multi, "2")
+wn.onkeypress(lambda: wn.bye(), "q")
+
+# MOVIMIENTO
+def move(t):
+    x = t.xcor()
+    y = t.ycor()
+    if t.direction == "up": t.sety(y + MOVE)
+    if t.direction == "down": t.sety(y - MOVE)
+    if t.direction == "left": t.setx(x - MOVE)
+    if t.direction == "right": t.setx(x + MOVE)
+
+def move_segments(head, segs):
+    for i in range(len(segs)-1, 0, -1):
+        segs[i].goto(segs[i-1].xcor(), segs[i-1].ycor())
+    if segs:
+        segs[0].goto(head.xcor(), head.ycor())
+
+# IA SIMPLE
+def ai_move():
+    if modo != "solo": return
+    if p2.direction == "stop": p2.direction = "left"
+
+    # seguir comida
+    if p2.xcor() < food.xcor():
+        p2.direction = "right"
+    elif p2.xcor() > food.xcor():
+        p2.direction = "left"
+    elif p2.ycor() < food.ycor():
+        p2.direction = "up"
+    else:
+        p2.direction = "down"
+
+# RESET
+def reset():
+    global seg1, seg2
+    for s in seg1 + seg2:
+        s.goto(1000,1000)
+    seg1.clear()
+    seg2.clear()
+
+    p1.goto(-100,0)
+    p2.goto(100,0)
+    p1.direction = "stop"
+    p2.direction = "stop"
+
+# LOOP
+menu()
+
+while True:
+    wn.update()
+
+    if estado == "game":
+        move_segments(p1, seg1)
+        move(p1)
+
+        if modo == "multi":
+            move_segments(p2, seg2)
+            move(p2)
+        else:
+            ai_move()
+            move_segments(p2, seg2)
+            move(p2)
+
+        # comida
+        if p1.distance(food) < 15:
+            food.goto(random.randint(-280,280), random.randint(-280,280))
+            s = turtle.Turtle()
+            s.shape("square")
+            s.color("green")
+            s.penup()
+            seg1.append(s)
+
+        if p2.distance(food) < 15:
+            food.goto(random.randint(-280,280), random.randint(-280,280))
+            s = turtle.Turtle()
+            s.shape("square")
+            s.color("cyan")
+            s.penup()
+            seg2.append(s)
+
+        # colisiones
+        if abs(p1.xcor()) > 290 or abs(p1.ycor()) > 290:
+            estado = "menu"
+            menu()
+
+        if abs(p2.xcor()) > 290 or abs(p2.ycor()) > 290:
+            estado = "menu"
+            menu()
+
+    time.sleep(delay)import turtle
+import random
+import time
+
+# CONFIG
+ANCHO = 600
+ALTO = 600
+MOVE = 20
+estado = "menu"
+modo = "solo"  # solo / multi
+delay = 0.12
+
+# VENTANA
+wn = turtle.Screen()
+wn.title("Snake Completo")
+wn.bgcolor("black")
+wn.setup(width=ANCHO, height=ALTO)
+wn.tracer(0)
+
+# TEXTO
+texto = turtle.Turtle()
+texto.hideturtle()
+texto.penup()
+texto.color("white")
+
+def draw_text(msg, y):
+    texto.goto(0, y)
+    texto.write(msg, align="center", font=("Arial", 18, "bold"))
+
+def menu():
+    texto.clear()
+    draw_text("SNAKE", 120)
+    draw_text("1 = Solo (vs IA)", 60)
+    draw_text("2 = 2 Jugadores", 20)
+    draw_text("Q = Salir", -20)
+
+# JUGADORES
+def crear_cabeza(color, x):
+    t = turtle.Turtle()
+    t.shape("square")
+    t.color(color)
+    t.penup()
+    t.goto(x, 0)
+    t.direction = "stop"
+    return t
+
+p1 = crear_cabeza("lime", -100)
+p2 = crear_cabeza("cyan", 100)
+
+seg1 = []
+seg2 = []
+
+# COMIDA
+food = turtle.Turtle()
+food.shape("circle")
+food.color("red")
+food.penup()
+food.goto(0, 100)
+
+# CONTROLES
+def up1(): 
+    if p1.direction != "down": p1.direction = "up"
+def down1(): 
+    if p1.direction != "up": p1.direction = "down"
+def left1(): 
+    if p1.direction != "right": p1.direction = "left"
+def right1(): 
+    if p1.direction != "left": p1.direction = "right"
+
+def up2(): 
+    if p2.direction != "down": p2.direction = "up"
+def down2(): 
+    if p2.direction != "up": p2.direction = "down"
+def left2(): 
+    if p2.direction != "right": p2.direction = "left"
+def right2(): 
+    if p2.direction != "left": p2.direction = "right"
+
+wn.listen()
+wn.onkeypress(up1, "Up")
+wn.onkeypress(down1, "Down")
+wn.onkeypress(left1, "Left")
+wn.onkeypress(right1, "Right")
+
+wn.onkeypress(up2, "w")
+wn.onkeypress(down2, "s")
+wn.onkeypress(left2, "a")
+wn.onkeypress(right2, "d")
+
+def start_solo():
+    global estado, modo
+    estado = "game"
+    modo = "solo"
+    reset()
+
+def start_multi():
+    global estado, modo
+    estado = "game"
+    modo = "multi"
+    reset()
+
+wn.onkeypress(start_solo, "1")
+wn.onkeypress(start_multi, "2")
+wn.onkeypress(lambda: wn.bye(), "q")
+
+# MOVIMIENTO
+def move(t):
+    x = t.xcor()
+    y = t.ycor()
+    if t.direction == "up": t.sety(y + MOVE)
+    if t.direction == "down": t.sety(y - MOVE)
+    if t.direction == "left": t.setx(x - MOVE)
+    if t.direction == "right": t.setx(x + MOVE)
+
+def move_segments(head, segs):
+    for i in range(len(segs)-1, 0, -1):
+        segs[i].goto(segs[i-1].xcor(), segs[i-1].ycor())
+    if segs:
+        segs[0].goto(head.xcor(), head.ycor())
+
+# IA SIMPLE
+def ai_move():
+    if modo != "solo": return
+    if p2.direction == "stop": p2.direction = "left"
+
+    # seguir comida
+    if p2.xcor() < food.xcor():
+        p2.direction = "right"
+    elif p2.xcor() > food.xcor():
+        p2.direction = "left"
+    elif p2.ycor() < food.ycor():
+        p2.direction = "up"
+    else:
+        p2.direction = "down"
+
+# RESET
+def reset():
+    global seg1, seg2
+    for s in seg1 + seg2:
+        s.goto(1000,1000)
+    seg1.clear()
+    seg2.clear()
+
+    p1.goto(-100,0)
+    p2.goto(100,0)
+    p1.direction = "stop"
+    p2.direction = "stop"
+
+# LOOP
+menu()
+
+while True:
+    wn.update()
+
+    if estado == "game":
+        move_segments(p1, seg1)
+        move(p1)
+
+        if modo == "multi":
+            move_segments(p2, seg2)
+            move(p2)
+        else:
+            ai_move()
+            move_segments(p2, seg2)
+            move(p2)
+
+        # comida
+        if p1.distance(food) < 15:
+            food.goto(random.randint(-280,280), random.randint(-280,280))
+            s = turtle.Turtle()
+            s.shape("square")
+            s.color("green")
+            s.penup()
+            seg1.append(s)
+
+        if p2.distance(food) < 15:
+            food.goto(random.randint(-280,280), random.randint(-280,280))
+            s = turtle.Turtle()
+            s.shape("square")
+            s.color("cyan")
+            s.penup()
+            seg2.append(s)
+
+        # colisiones
+        if abs(p1.xcor()) > 290 or abs(p1.ycor()) > 290:
+            estado = "menu"
+            menu()
+
+        if abs(p2.xcor()) > 290 or abs(p2.ycor()) > 290:
+            estado = "menu"
+            menu()
+
+    time.sleep(delay)
+    

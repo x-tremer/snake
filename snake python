@@ -1,0 +1,186 @@
+import socket
+import threading
+import json
+import turtle
+import time
+
+SERVER_IP = "127.0.0.1"   # cambia esto si te conectas a otro PC
+PORT = 5055
+
+ANCHO = 700
+ALTO = 700
+CELL = 20
+OFFSET_X = -340
+OFFSET_Y = -340
+
+sock = None
+my_player_id = None
+latest_state = None
+running = True
+
+# =========================
+# RED
+# =========================
+def send_json(data):
+    global sock
+    try:
+        sock.sendall(json.dumps(data).encode("utf-8") + b"\n")
+    except:
+        pass
+
+def receiver():
+    global latest_state, my_player_id, running
+    buffer = b""
+    while running:
+        try:
+            data = sock.recv(4096)
+            if not data:
+                break
+            buffer += data
+            while b"\n" in buffer:
+                line, buffer = buffer.split(b"\n", 1)
+                if not line.strip():
+                    continue
+                msg = json.loads(line.decode("utf-8"))
+                if msg.get("type") == "welcome":
+                    my_player_id = msg["player_id"]
+                elif msg.get("type") == "state":
+                    latest_state = msg["state"]
+        except:
+            break
+    running = False
+
+# =========================
+# TURTLE
+# =========================
+wn = turtle.Screen()
+wn.title("Snake Online")
+wn.bgcolor("black")
+wn.setup(width=ANCHO, height=ALTO)
+wn.tracer(0)
+
+drawer = turtle.Turtle()
+drawer.hideturtle()
+drawer.penup()
+drawer.speed(0)
+drawer.color("white")
+
+def to_screen(x, y):
+    return OFFSET_X + x * CELL, OFFSET_Y + y * CELL
+
+def draw_square(x, y, color):
+    sx, sy = to_screen(x, y)
+    drawer.goto(sx, sy)
+    drawer.color(color)
+    drawer.begin_fill()
+    for _ in range(4):
+        drawer.forward(CELL)
+        drawer.left(90)
+    drawer.end_fill()
+
+def draw_border():
+    drawer.color("gray")
+    drawer.pensize(3)
+    drawer.goto(OFFSET_X + CELL, OFFSET_Y + CELL)
+    drawer.pendown()
+    drawer.goto(OFFSET_X + CELL * 34, OFFSET_Y + CELL)
+    drawer.goto(OFFSET_X + CELL * 34, OFFSET_Y + CELL * 34)
+    drawer.goto(OFFSET_X + CELL, OFFSET_Y + CELL * 34)
+    drawer.goto(OFFSET_X + CELL, OFFSET_Y + CELL)
+    drawer.penup()
+    drawer.pensize(1)
+
+def render():
+    drawer.clear()
+
+    if not latest_state:
+        drawer.goto(0, 0)
+        drawer.write("Conectando...", align="center", font=("Arial", 18, "bold"))
+        wn.update()
+        return
+
+    draw_border()
+
+    state = latest_state
+    players = state["players"]
+
+    food = state["food"]
+    draw_square(food[0], food[1], "red")
+
+    colors = {
+        "p1_head": "lime",
+        "p1_body": "green",
+        "p2_head": "cyan",
+        "p2_body": "deepskyblue"
+    }
+
+    for i, part in enumerate(players["p1"]["body"]):
+        draw_square(part[0], part[1], colors["p1_head"] if i == 0 else colors["p1_body"])
+
+    for i, part in enumerate(players["p2"]["body"]):
+        draw_square(part[0], part[1], colors["p2_head"] if i == 0 else colors["p2_body"])
+
+    drawer.goto(0, 315)
+    drawer.color("white")
+    drawer.write(
+        f"Tú: {my_player_id} | "
+        f"P1: {players['p1']['score']} | "
+        f"{players['p2']['name']}: {players['p2']['score']} | "
+        f"{state['message']}",
+        align="center",
+        font=("Arial", 14, "bold")
+    )
+
+    if state["status"] == "gameover":
+        drawer.goto(0, 0)
+        drawer.color("yellow")
+        drawer.write(
+            f"FIN: {state['winner']} | R = reiniciar",
+            align="center",
+            font=("Arial", 18, "bold")
+        )
+
+    wn.update()
+
+# =========================
+# INPUT
+# =========================
+def up():
+    send_json({"type": "input", "direction": "UP"})
+
+def down():
+    send_json({"type": "input", "direction": "DOWN"})
+
+def left():
+    send_json({"type": "input", "direction": "LEFT"})
+
+def right():
+    send_json({"type": "input", "direction": "RIGHT"})
+
+def restart():
+    send_json({"type": "restart"})
+
+wn.listen()
+wn.onkeypress(up, "Up")
+wn.onkeypress(down, "Down")
+wn.onkeypress(left, "Left")
+wn.onkeypress(right, "Right")
+wn.onkeypress(restart, "r")
+
+def main():
+    global sock
+    ip = wn.textinput("Conexión", "IP del servidor:")
+    if not ip:
+        ip = SERVER_IP
+
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.connect((ip, PORT))
+
+    threading.Thread(target=receiver, daemon=True).start()
+
+    while running:
+        render()
+        time.sleep(0.03)
+
+if __name__ == "__main__":
+    main()
