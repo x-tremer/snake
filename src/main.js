@@ -3,6 +3,7 @@ import { CanvasRenderer } from './renderer/CanvasRenderer.js';
 import { KeyboardHandler, ACTION_TYPES } from './input/KeyboardHandler.js';
 import { TouchHandler } from './input/TouchHandler.js';
 import { STATES } from './config.js';
+import { loadCodes, isValid, saveCode, isAuthenticated } from './auth.js';
 
 const canvas = document.getElementById('game-canvas');
 
@@ -12,20 +13,47 @@ const keyboard = new KeyboardHandler();
 const touch = new TouchHandler();
 
 keyboard._getGameState = () => gameState.getState();
+keyboard._getAuthState = () => gameState.authenticated;
+
+// --- Login code buffer ---
+let loginCode = '';
+
+// --- Auth: load codes, then check URL / localStorage ---
+async function initAuth() {
+  await loadCodes();
+
+  const params = new URLSearchParams(window.location.search);
+  const codeFromUrl = params.get('code');
+  if (codeFromUrl) {
+    if (isValid(codeFromUrl)) {
+      saveCode(codeFromUrl);
+      const cleanUrl = window.location.pathname;
+      window.history.replaceState({}, '', cleanUrl);
+    }
+  }
+
+  gameState.authenticated = isAuthenticated();
+}
 
 function handleAction(action) {
   switch (action.type) {
     case ACTION_TYPES.DIRECTION:
-    case 'DIRECTION':
-      gameState._pendingActions = gameState._pendingActions || [];
-      gameState._pendingActions.push(action);
+    case 'DIRECTION': {
+      const playerIdx = (action.player || 1) - 1;
+      const snakes = gameState.getSnakes();
+      if (snakes[playerIdx] && snakes[playerIdx].alive) {
+        snakes[playerIdx].setDirection(action.direction);
+      }
       break;
+    }
     case ACTION_TYPES.START_1P:
     case 'START_1P':
+      if (!gameState.authenticated) break;
       gameState.init1P();
       break;
     case ACTION_TYPES.START_2P:
     case 'START_2P':
+      if (!gameState.authenticated) break;
       gameState.init2P();
       break;
     case ACTION_TYPES.PAUSE:
@@ -34,6 +62,7 @@ function handleAction(action) {
       break;
     case ACTION_TYPES.RESTART:
     case 'RESTART':
+      if (!gameState.authenticated) break;
       if (gameState.getState() === STATES.GAME_OVER) {
         gameState.restart();
       } else if (gameState.getState() === STATES.MENU) {
@@ -51,6 +80,25 @@ function handleAction(action) {
     case ACTION_TYPES.CYCLE_MAP:
     case 'CYCLE_MAP':
       gameState.cycleMap();
+      break;
+    case ACTION_TYPES.LOGIN:
+    case 'LOGIN': {
+      if (isValid(loginCode)) {
+        saveCode(loginCode);
+        gameState.authenticated = true;
+        loginCode = '';
+      }
+      break;
+    }
+    case ACTION_TYPES.LOGIN_CHAR:
+    case 'LOGIN_CHAR':
+      if (loginCode.length < 12) loginCode += action.char;
+      gameState.loginCode = loginCode;
+      break;
+    case ACTION_TYPES.LOGIN_BACKSPACE:
+    case 'LOGIN_BACKSPACE':
+      loginCode = loginCode.slice(0, -1);
+      gameState.loginCode = loginCode;
       break;
   }
 }
@@ -110,27 +158,16 @@ function gameLoop(timestamp) {
   if (state === STATES.PLAYING_1P || state === STATES.PLAYING_2P) {
     accumulator += deltaTime;
 
-    const actions = gameState._pendingActions || [];
-    gameState._pendingActions = [];
-
-    // Keep only the LAST direction action — prevents stale keystrokes from
-    // queueing a now-invalid direction (e.g. ↑ then ↓ would process ↑ first
-    // and block ↓ as a reverse, when the user clearly wanted ↓).
-    const lastDir = {};
-    for (const a of actions) {
-      lastDir[a.player || 1] = a;
-    }
-    const filtered = Object.values(lastDir);
-
     while (accumulator >= gameState.getDelay()) {
-      gameState.tick(filtered);
-      filtered.length = 0;
+      gameState.tick([]);
       accumulator -= gameState.getDelay();
     }
   }
 
   renderer.render(gameState);
+initAuth().then(() => {
   requestAnimationFrame(gameLoop);
+});
 }
 
 requestAnimationFrame(gameLoop);

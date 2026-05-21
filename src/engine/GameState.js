@@ -65,16 +65,6 @@ export class GameState {
       return null;
     }
 
-    // Process direction changes
-    for (const action of actions) {
-      if (action.type === 'DIRECTION' && action.player) {
-        const snake = this.snakes[action.player - 1];
-        if (snake && snake.alive) {
-          snake.setDirection(action.direction);
-        }
-      }
-    }
-
     // Move snakes
     for (const snake of this.snakes) {
       if (snake.alive) snake.move();

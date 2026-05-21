@@ -9,6 +9,9 @@ export const ACTION_TYPES = {
   MENU: 'MENU',
   CYCLE_SKIN: 'CYCLE_SKIN',
   CYCLE_MAP: 'CYCLE_MAP',
+  LOGIN: 'LOGIN',
+  LOGIN_CHAR: 'LOGIN_CHAR',
+  LOGIN_BACKSPACE: 'LOGIN_BACKSPACE',
 };
 
 const KEY_MAP = {
@@ -55,6 +58,28 @@ export class KeyboardHandler {
 
   _onKeydown(event) {
     const mapped = KEY_MAP[event.key];
+
+    // --- Login mode: capture text input when unauthenticated ---
+    if (this._getAuthState && !this._getAuthState() && this._getGameState && this._getGameState() === STATES.MENU) {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        for (const cb of this.callbacks) cb({ type: ACTION_TYPES.LOGIN });
+        return;
+      }
+      if (event.key === 'Backspace') {
+        event.preventDefault();
+        for (const cb of this.callbacks) cb({ type: ACTION_TYPES.LOGIN_BACKSPACE });
+        return;
+      }
+      // Allow letters, numbers, and dash
+      if (/^[a-zA-Z0-9]$/.test(event.key)) {
+        event.preventDefault();
+        for (const cb of this.callbacks) cb({ type: ACTION_TYPES.LOGIN_CHAR, char: event.key.toUpperCase() });
+        return;
+      }
+      return;
+    }
+
     if (!mapped) return;
 
     // Prevent default on game keys

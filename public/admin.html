@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Snake · Admin · Samu</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #0a0a0a;
+      color: #ddd;
+      min-height: 100vh;
+      padding: 20px;
+    }
+    .container { max-width: 720px; margin: 0 auto; }
+    h1 {
+      font-size: 28px;
+      color: #32cd32;
+      text-align: center;
+      margin-bottom: 8px;
+    }
+    h1 span { color: #fff; font-weight: 300; }
+    .subtitle { text-align: center; color: #888; margin-bottom: 32px; font-size: 14px; }
+
+    .card {
+      background: #141414;
+      border: 1px solid #222;
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 20px;
+    }
+    .card h2 {
+      font-size: 16px;
+      color: #ccc;
+      margin-bottom: 16px;
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 20px;
+    }
+    button {
+      background: #32cd32;
+      color: #000;
+      border: none;
+      padding: 12px 20px;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    button:hover { background: #28a428; }
+    button.secondary {
+      background: #333;
+      color: #ccc;
+    }
+    button.secondary:hover { background: #444; }
+    button.danger {
+      background: transparent;
+      color: #ff4444;
+      border: 1px solid #ff4444;
+    }
+    button.danger:hover { background: #ff444420; }
+
+    .qr-preview {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      padding: 16px;
+      background: #fff;
+      border-radius: 8px;
+      margin-bottom: 16px;
+    }
+    .qr-preview canvas { display: block; }
+    .code-label {
+      font-family: monospace;
+      font-size: 20px;
+      font-weight: bold;
+      color: #32cd32;
+      background: #0a0a0a;
+      padding: 4px 14px;
+      border-radius: 6px;
+    }
+    .link-bar {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      width: 100%;
+    }
+    .link-bar input {
+      flex: 1;
+      background: #1a1a1a;
+      border: 1px solid #333;
+      color: #ccc;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-family: monospace;
+    }
+
+    .code-list {
+      display: grid;
+      gap: 10px;
+    }
+    .code-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: #1a1a1a;
+      padding: 10px 14px;
+      border-radius: 8px;
+    }
+    .code-row .mini-qr { flex-shrink: 0; }
+    .code-row .info { flex: 1; }
+    .code-row .info .code { font-family: monospace; color: #32cd32; font-weight: bold; font-size: 14px; }
+    .code-row .info .date { font-size: 11px; color: #666; }
+    .empty { text-align: center; color: #555; padding: 20px; }
+
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #32cd32;
+      color: #000;
+      padding: 10px 24px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 14px;
+      z-index: 999;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    .toast.show { opacity: 1; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🐍 Snake <span>· Admin</span></h1>
+    <p class="subtitle">Samu — generate codes for your classmates</p>
+
+    <div class="card">
+      <h2>✨ New code</h2>
+      <div class="actions">
+        <button id="btn-generate">Generate random</button>
+        <button id="btn-custom" class="secondary">Custom name</button>
+      </div>
+
+      <div id="preview-area"></div>
+    </div>
+
+    <div class="card">
+      <h2>📋 Generated codes (<span id="count">0</span>)</h2>
+      <div id="code-list" class="code-list">
+        <div class="empty">No codes yet. Generate one!</div>
+      </div>
+      <div class="actions" style="margin-top:16px; justify-content:flex-end;">
+        <button id="btn-clear-all" class="danger">Clear all</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1/build/qrcode.min.js"></script>
+
+  <script>
+    const STORAGE_KEY = 'snake-admin-codes';
+    const BASE_URL = 'https://x-tremer.github.io/snake/?code=';
+
+    // --- Storage helpers (same key as src/auth.js) ---
+    function getCodes() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        return raw ? JSON.parse(raw) : [];
+      } catch { return []; }
+    }
+
+    function saveCodes(list) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+    }
+
+    function generateCode(customName) {
+      if (customName) {
+        return 'SNAKE-' + customName.trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10);
+      }
+      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no I,O,0,1 to avoid confusion
+      let code = 'SNAKE-';
+      for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
+      return code;
+    }
+
+    function addCode(code) {
+      const codes = getCodes();
+      const entry = { code, date: new Date().toISOString().slice(0, 10) };
+      codes.unshift(entry);
+      saveCodes(codes);
+      return entry;
+    }
+
+    function removeCode(code) {
+      const codes = getCodes().filter(c => c.code !== code);
+      saveCodes(codes);
+    }
+
+    function clearAll() {
+      saveCodes([]);
+    }
+
+    function toast(msg) {
+      const el = document.getElementById('toast');
+      el.textContent = msg;
+      el.classList.add('show');
+      setTimeout(() => el.classList.remove('show'), 2500);
+    }
+
+    // --- Preview area ---
+    const previewEl = document.getElementById('preview-area');
+
+    function showPreview(code) {
+      const url = BASE_URL + code;
+      previewEl.innerHTML = `
+        <div class="qr-preview">
+          <span class="code-label">${code}</span>
+          <canvas id="qr-canvas"></canvas>
+          <div class="link-bar">
+            <input id="link-input" type="text" value="${url}" readonly />
+            <button onclick="copyLink('${url}')" class="secondary">Copy</button>
+            <button onclick="downloadQR('${code}')" class="secondary">Download</button>
+          </div>
+        </div>
+      `;
+      QRCode.toCanvas(document.getElementById('qr-canvas'), url, { width: 220, margin: 1 });
+      window._previewCode = code;
+    }
+
+    window.copyLink = function(url) {
+      navigator.clipboard.writeText(url).then(() => toast('Link copied!'));
+    };
+
+    window.downloadQR = function(code) {
+      const canvas = document.getElementById('qr-canvas');
+      if (!canvas) return;
+      const link = document.createElement('a');
+      link.download = code + '-QR.png';
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+      toast('QR downloaded!');
+    };
+
+    // --- Code list ---
+    function renderList() {
+      const codes = getCodes();
+      const listEl = document.getElementById('code-list');
+      document.getElementById('count').textContent = codes.length;
+
+      if (codes.length === 0) {
+        listEl.innerHTML = '<div class="empty">No codes yet. Generate one!</div>';
+        return;
+      }
+
+      listEl.innerHTML = codes.map((entry, idx) => {
+        const url = BASE_URL + entry.code;
+        const canvasId = 'mini-qr-' + idx;
+        // Mini QR rendered after DOM insert
+        setTimeout(() => {
+          const c = document.getElementById(canvasId);
+          if (c) QRCode.toCanvas(c, url, { width: 50, margin: 0 });
+        }, 50);
+        return `
+          <div class="code-row">
+            <canvas id="${canvasId}" class="mini-qr" width="50" height="50"></canvas>
+            <div class="info">
+              <div class="code">${entry.code}</div>
+              <div class="date">${entry.date}</div>
+            </div>
+            <button class="secondary" onclick="previewExisting('${entry.code}')">QR</button>
+            <button class="secondary" onclick="copyFromList('${entry.code}')">Copy</button>
+            <button class="danger" onclick="deleteCode('${entry.code}')">Delete</button>
+          </div>
+        `;
+      }).join('');
+    }
+
+    window.previewExisting = function(code) {
+      showPreview(code);
+    };
+
+    window.copyFromList = function(code) {
+      navigator.clipboard.writeText(BASE_URL + code).then(() => toast('Link copied!'));
+    };
+
+    window.deleteCode = function(code) {
+      removeCode(code);
+      renderList();
+      if (window._previewCode === code) previewEl.innerHTML = '';
+      toast('Code deleted.');
+    };
+
+    document.getElementById('btn-generate').addEventListener('click', () => {
+      const code = generateCode();
+      addCode(code);
+      showPreview(code);
+      renderList();
+      toast('Code generated!');
+    });
+
+    document.getElementById('btn-custom').addEventListener('click', () => {
+      const name = prompt("Enter buyer's name or ID (letters and numbers only):");
+      if (!name) return;
+      const code = generateCode(name);
+      if (!code || code === 'SNAKE-') {
+        toast('Invalid name — use letters and numbers.');
+        return;
+      }
+      addCode(code);
+      showPreview(code);
+      renderList();
+      toast('Custom code generated!');
+    });
+
+    document.getElementById('btn-clear-all').addEventListener('click', () => {
+      if (confirm('Delete ALL generated codes? This cannot be undone.')) {
+        clearAll();
+        renderList();
+        previewEl.innerHTML = '';
+        toast('All codes cleared.');
+      }
+    });
+
+    // Init
+    renderList();
+  </script>
+</body>
+</html>
