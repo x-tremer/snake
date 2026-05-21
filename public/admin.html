@@ -185,14 +185,27 @@
       localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
     }
 
+    // Same alphabet and checksum algorithm as src/auth.js
+    const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+
+    function checksumChar(body) {
+      let sum = 0;
+      for (const ch of body) sum += ALPHABET.indexOf(ch);
+      return ALPHABET[sum % ALPHABET.length];
+    }
+
     function generateCode(customName) {
+      let body;
       if (customName) {
-        return 'SNAKE-' + customName.trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10);
+        // Use buyer's name, pad/truncate to exactly 6 chars
+        body = customName.toUpperCase().replace(/[^A-Z2-9]/g, '').slice(0, 6);
+        while (body.length < 6) body += ALPHABET[Math.floor(Math.random() * ALPHABET.length)];
+      } else {
+        body = '';
+        for (let i = 0; i < 6; i++) body += ALPHABET[Math.floor(Math.random() * ALPHABET.length)];
       }
-      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no I,O,0,1 to avoid confusion
-      let code = 'SNAKE-';
-      for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
-      return code;
+      const check = checksumChar(body);
+      return 'SNAKE-' + body + check;
     }
 
     function addCode(code) {

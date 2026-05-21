@@ -3,7 +3,7 @@ import { CanvasRenderer } from './renderer/CanvasRenderer.js';
 import { KeyboardHandler, ACTION_TYPES } from './input/KeyboardHandler.js';
 import { TouchHandler } from './input/TouchHandler.js';
 import { STATES } from './config.js';
-import { loadCodes, isValid, saveCode, isAuthenticated } from './auth.js';
+import { isValid, saveCode, isAuthenticated } from './auth.js';
 
 const canvas = document.getElementById('game-canvas');
 
@@ -18,22 +18,18 @@ keyboard._getAuthState = () => gameState.authenticated;
 // --- Login code buffer ---
 let loginCode = '';
 
-// --- Auth: load codes, then check URL / localStorage ---
-async function initAuth() {
-  await loadCodes();
-
-  const params = new URLSearchParams(window.location.search);
-  const codeFromUrl = params.get('code');
-  if (codeFromUrl) {
-    if (isValid(codeFromUrl)) {
-      saveCode(codeFromUrl);
-      const cleanUrl = window.location.pathname;
-      window.history.replaceState({}, '', cleanUrl);
-    }
+// --- Auth: check ?code= in URL or existing localStorage (sync — checksum-based) ---
+const params = new URLSearchParams(window.location.search);
+const codeFromUrl = params.get('code');
+if (codeFromUrl) {
+  if (isValid(codeFromUrl)) {
+    saveCode(codeFromUrl);
+    const cleanUrl = window.location.pathname;
+    window.history.replaceState({}, '', cleanUrl);
   }
-
-  gameState.authenticated = isAuthenticated();
 }
+
+gameState.authenticated = isAuthenticated();
 
 function handleAction(action) {
   switch (action.type) {
@@ -165,9 +161,7 @@ function gameLoop(timestamp) {
   }
 
   renderer.render(gameState);
-initAuth().then(() => {
-  requestAnimationFrame(gameLoop);
-});
+requestAnimationFrame(gameLoop);
 }
 
 requestAnimationFrame(gameLoop);
