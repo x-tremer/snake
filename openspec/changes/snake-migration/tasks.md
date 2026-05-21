@@ -135,49 +135,49 @@ Chain strategy: feature-branch-chain
 
 ## Phase 4: PWA + Mobile Packaging
 
-- [ ] **T021** — Create `public/index.html` with canvas element and minimal meta tags.
+- [x] **T021** — Create `public/index.html` with canvas element and minimal meta tags.
   Files: `public/index.html`.
   Acceptance: page loads; canvas element present.
   Depends: T001.
 
-- [ ] **T022** — Create service worker (cache-first static assets) and PWA manifest (name, 192/512 icons, `display: standalone`).
+- [x] **T022** — Create service worker (cache-first static assets) and PWA manifest (name, 192/512 icons, `display: standalone`).
   Files: `public/sw.js`, `public/manifest.json`.
   Acceptance: Lighthouse PWA audit passes.
   Depends: T021.
 
-- [ ] **T023** — Add Capacitor config and platform wrappers (iOS/Android build scripts).
+- [x] **T023** — Add Capacitor config and platform wrappers (iOS/Android build scripts).
   Files: `capacitor.config.json`.
   Acceptance: `npx cap sync` completes without errors.
   Depends: T021.
 
-- [ ] **T024** — Add PWA assets (192px, 512px icons and splash screens) to `assets/`.
+- [x] **T024** — Add PWA assets (192px, 512px icons and splash screens) to `assets/`.
   Files: `assets/icons/*`, `assets/splash/*`.
   Acceptance: manifest references valid icon paths.
   Depends: T022.
 
-- [ ] **T025** — Implement install prompt and full-screen behavior handling.
+- [x] **T025** — Implement install prompt and full-screen behavior handling.
   Files: `src/main.js` (or `src/pwa.js`).
   Acceptance: prompt shown on eligible browsers; `display: standalone` active.
   Depends: T022.
 
 ## Phase 5: Polish
 
-- [ ] **T026** — Create TouchHandler (swipe detection + on-screen D-pad fallback for touch devices).
+- [x] **T026** — Create TouchHandler (swipe detection + on-screen D-pad fallback for touch devices).
   Files: `src/input/TouchHandler.js`.
   Acceptance: swipe changes direction; d-pad renders and works on touch.
   Depends: T007.
 
-- [ ] **T027** — Implement responsive canvas sizing (fit viewport, maintain aspect ratio, devicePixelRatio aware).
+- [x] **T027** — Implement responsive canvas sizing (fit viewport, maintain aspect ratio, devicePixelRatio aware).
   Files: `src/main.js`, `src/renderer/CanvasRenderer.js`.
   Acceptance: canvas scales correctly on resize/orientation change.
   Depends: T006.
 
-- [ ] **T028** — Add background particle/starfield effect.
+- [x] **T028** — Add background particle/starfield effect.
   Files: `src/renderer/particles.js`.
   Acceptance: subtle animated background visible behind game.
   Depends: T006.
 
-- [ ] **T029** — Final integration verification: manual playthrough covering 1P, 2P, pause, record persistence, level progression, all maps/skins/foods.
+- [x] **T029** — Final integration verification: manual playthrough covering 1P, 2P, pause, record persistence, level progression, all maps/skins/foods.
   Files: N/A.
   Acceptance: all spec scenarios pass; no console errors.
   Depends: all above.

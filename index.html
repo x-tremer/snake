@@ -2,7 +2,14 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#000000" />
+  <meta name="description" content="Classic Snake game — play solo or two players. Runs everywhere." />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="icon" type="image/svg+xml" href="/icons/icon-192.svg" />
+  <link rel="apple-touch-icon" href="/icons/icon-192.svg" />
   <title>Snake</title>
   <style>
     html, body {
@@ -13,8 +20,13 @@
       justify-content: center;
       align-items: center;
       height: 100vh;
+      height: 100dvh;
+      overflow: hidden;
       color: #fff;
       font-family: sans-serif;
+      touch-action: none;
+      -webkit-user-select: none;
+      user-select: none;
     }
     canvas {
       background: #000;
@@ -24,6 +36,14 @@
 </head>
 <body>
   <canvas id="game-canvas" width="600" height="600"></canvas>
+  <script>
+    // Register service worker for PWA offline support
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function() {
+        navigator.serviceWorker.register('/sw.js').catch(function() {});
+      });
+    }
+  </script>
   <script type="module" src="/src/main.js"></script>
 </body>
 </html>

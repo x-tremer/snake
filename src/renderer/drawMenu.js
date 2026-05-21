@@ -1,7 +1,8 @@
 import { CANVAS_WIDTH, CANVAS_HEIGHT, SKINS, MAPS } from '../config.js';
 
 export function drawMenu(ctx, gameState) {
-  ctx.fillStyle = '#000000';
+  // Semi-transparent overlay so particles show through
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
   ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
   // Subtle gray border/frame

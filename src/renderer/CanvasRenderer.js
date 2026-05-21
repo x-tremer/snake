@@ -4,6 +4,7 @@ import { drawSnake } from './drawSnake.js';
 import { drawFood } from './drawFood.js';
 import { drawHUD } from './drawHUD.js';
 import { drawMenu } from './drawMenu.js';
+import { ParticleSystem } from './particles.js';
 
 export class CanvasRenderer {
   constructor(canvasElement) {
@@ -12,11 +13,16 @@ export class CanvasRenderer {
     this.canvas.width = CANVAS_WIDTH;
     this.canvas.height = CANVAS_HEIGHT;
     this._time = 0;
+    this.particles = new ParticleSystem(30);
   }
 
   render(gameState) {
     this._time += 0.05;
     this.clear();
+
+    // Particles always render (background effect)
+    this.particles.update();
+    this.particles.draw(this.ctx);
 
     const state = gameState.getState();
 
