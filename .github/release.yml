@@ -1,0 +1,22 @@
+changelog:
+  categories:
+    - title: '🎉 Novedades'
+      labels:
+        - 'type:feature'
+    - title: '🐛 Correcciones'
+      labels:
+        - 'type:bug'
+    - title: '📚 Documentación'
+      labels:
+        - 'type:docs'
+    - title: '🔧 Mantenimiento'
+      labels:
+        - 'type:chore'
+        - 'type:refactor'
+    - title: '⚡ Breaking Changes'
+      labels:
+        - 'type:breaking-change'
+  exclude:
+    labels:
+      - 'wontfix'
+      - 'duplicate'
