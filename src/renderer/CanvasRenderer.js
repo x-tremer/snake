@@ -31,7 +31,10 @@ export class CanvasRenderer {
       return;
     }
 
-    // Draw obstacles first (background layer)
+    // Draw border — shows the playable area limits (10px dead zone)
+    this.drawBorder();
+
+    // Draw obstacles (background layer)
     this.drawObstacles(gameState.getObstacles());
 
     // Draw food behind snakes
@@ -58,6 +61,12 @@ export class CanvasRenderer {
       this.drawGameOverOverlay(gameState);
       return;
     }
+  }
+
+  drawBorder() {
+    this.ctx.strokeStyle = '#222222';
+    this.ctx.lineWidth = 1;
+    this.ctx.strokeRect(10, 10, CANVAS_WIDTH - 20, CANVAS_HEIGHT - 20);
   }
 
   drawObstacles(obstacles) {

@@ -113,9 +113,18 @@ function gameLoop(timestamp) {
     const actions = gameState._pendingActions || [];
     gameState._pendingActions = [];
 
+    // Keep only the LAST direction action — prevents stale keystrokes from
+    // queueing a now-invalid direction (e.g. ↑ then ↓ would process ↑ first
+    // and block ↓ as a reverse, when the user clearly wanted ↓).
+    const lastDir = {};
+    for (const a of actions) {
+      lastDir[a.player || 1] = a;
+    }
+    const filtered = Object.values(lastDir);
+
     while (accumulator >= gameState.getDelay()) {
-      gameState.tick(actions);
-      actions.length = 0;
+      gameState.tick(filtered);
+      filtered.length = 0;
       accumulator -= gameState.getDelay();
     }
   }
