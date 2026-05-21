@@ -197,8 +197,8 @@
     function generateCode(customName) {
       let body;
       if (customName) {
-        // Use buyer's name, pad/truncate to exactly 6 chars
-        body = customName.toUpperCase().replace(/[^A-Z2-9]/g, '').slice(0, 6);
+        // Keep only chars from the alphabet (filters I, O, 0, 1 automatically)
+        body = customName.toUpperCase().split('').filter(ch => ALPHABET.includes(ch)).join('').slice(0, 6);
         while (body.length < 6) body += ALPHABET[Math.floor(Math.random() * ALPHABET.length)];
       } else {
         body = '';
