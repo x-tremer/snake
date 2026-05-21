@@ -91,6 +91,11 @@ export class KeyboardHandler {
       return;
     }
 
+    // Map cycling only in MENU
+    if (mapped.type === ACTION_TYPES.CYCLE_MAP && currentState !== STATES.MENU) {
+      return;
+    }
+
     // 1/2 start from MENU or GAME_OVER
     if (
       (mapped.type === ACTION_TYPES.START_1P || mapped.type === ACTION_TYPES.START_2P) &&

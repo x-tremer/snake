@@ -23,9 +23,9 @@ export const Grid = {
     const padding = 10;
     return (
       x < padding ||
-      x > width - padding - GRID_SIZE ||
+      x >= width - padding - GRID_SIZE ||
       y < padding ||
-      y > height - padding - GRID_SIZE
+      y >= height - padding - GRID_SIZE
     );
   },
 

@@ -1,5 +1,9 @@
 import { CANVAS_WIDTH, CANVAS_HEIGHT, GRID_SIZE, STATES } from '../config.js';
 import { SKINS } from '../config.js';
+import { drawSnake } from './drawSnake.js';
+import { drawFood } from './drawFood.js';
+import { drawHUD } from './drawHUD.js';
+import { drawMenu } from './drawMenu.js';
 
 export class CanvasRenderer {
   constructor(canvasElement) {
@@ -7,96 +11,79 @@ export class CanvasRenderer {
     this.ctx = this.canvas.getContext('2d');
     this.canvas.width = CANVAS_WIDTH;
     this.canvas.height = CANVAS_HEIGHT;
+    this._time = 0;
   }
 
   render(gameState) {
+    this._time += 0.05;
     this.clear();
 
     const state = gameState.getState();
 
     if (state === STATES.MENU) {
-      this.drawMenu(gameState);
+      drawMenu(this.ctx, gameState);
       return;
     }
 
-    if (state === STATES.PLAYING_1P || state === STATES.PLAYING_2P) {
-      for (const snake of gameState.getSnakes()) {
-        this.drawSnake(snake);
-      }
-      this.drawHUD(gameState);
-      return;
+    // Draw obstacles first (background layer)
+    this.drawObstacles(gameState.getObstacles());
+
+    // Draw food behind snakes
+    const food = gameState.getFood();
+    if (food) {
+      drawFood(this.ctx, food, this._time);
     }
+
+    const skin = SKINS[gameState.currentSkin] || SKINS[0];
+    for (const snake of gameState.getSnakes()) {
+      drawSnake(this.ctx, snake, skin);
+    }
+
+    drawHUD(this.ctx, gameState);
 
     if (state === STATES.PAUSED) {
-      for (const snake of gameState.getSnakes()) {
-        this.drawSnake(snake);
-      }
-      this.drawHUD(gameState);
-      this.drawOverlay('PAUSED', '#ffffff');
+      this.drawPauseOverlay();
       return;
     }
 
     if (state === STATES.GAME_OVER) {
-      for (const snake of gameState.getSnakes()) {
-        this.drawSnake(snake);
-      }
-      this.drawHUD(gameState);
-      this.drawOverlay('GAME OVER', '#ff0000');
-      this.drawOverlay('Press Enter to restart', '#ffffff', 40, CANVAS_HEIGHT / 2 + 30);
+      this.drawGameOverOverlay();
       return;
     }
   }
 
-  drawSnake(snake) {
-    const skin = SKINS[snake.skinIndex] || SKINS[0];
-    this.ctx.fillStyle = skin.bodyColor;
-
-    for (let i = 0; i < snake.segments.length; i++) {
-      const seg = snake.segments[i];
-      if (i === 0) {
-        this.ctx.fillStyle = skin.headColor;
-      } else {
-        this.ctx.fillStyle = skin.bodyColor;
-      }
-      this.ctx.fillRect(seg.x, seg.y, GRID_SIZE, GRID_SIZE);
+  drawObstacles(obstacles) {
+    this.ctx.fillStyle = '#555555';
+    for (const obs of obstacles) {
+      this.ctx.fillRect(obs.x, obs.y, GRID_SIZE, GRID_SIZE);
     }
   }
 
-  drawHUD(gameState) {
-    this.ctx.fillStyle = '#ffffff';
-    this.ctx.font = '16px sans-serif';
-    this.ctx.textAlign = 'left';
-    this.ctx.fillText(`Score: ${gameState.getScore()}`, 10, 20);
-    this.ctx.fillText(`Record: ${gameState.record}`, 10, 40);
-    this.ctx.fillText(`Level: ${gameState.getLevel()}`, 10, 60);
-  }
-
-  drawOverlay(text, color, fontSize = 48, y = CANVAS_HEIGHT / 2) {
-    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+  drawPauseOverlay() {
+    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
     this.ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-    this.ctx.fillStyle = color;
-    this.ctx.font = `${fontSize}px sans-serif`;
+    this.ctx.fillStyle = '#ffff00';
+    this.ctx.font = 'bold 28px Arial, sans-serif';
     this.ctx.textAlign = 'center';
     this.ctx.textBaseline = 'middle';
-    this.ctx.fillText(text, CANVAS_WIDTH / 2, y);
+    this.ctx.fillText('PAUSED', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2);
+    this.ctx.fillStyle = '#ffffff';
+    this.ctx.font = '16px Arial, sans-serif';
+    this.ctx.fillText('Press P to continue', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 30);
   }
 
-  drawMenu(gameState) {
-    this.ctx.fillStyle = '#00ff00';
-    this.ctx.font = '36px sans-serif';
+  drawGameOverOverlay() {
+    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+    this.ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+    this.ctx.fillStyle = '#ff0000';
+    this.ctx.font = 'bold 28px Arial, sans-serif';
     this.ctx.textAlign = 'center';
     this.ctx.textBaseline = 'middle';
-    this.ctx.fillText('Snake', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 60);
-
+    this.ctx.fillText('GAME OVER', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 20);
     this.ctx.fillStyle = '#ffffff';
-    this.ctx.font = '20px sans-serif';
-    this.ctx.fillText('Press Enter to start', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2);
-    this.ctx.fillText('1: 1 Player   2: 2 Players', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 30);
-    this.ctx.fillText('K: Change Skin', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 60);
-
-    const skin = SKINS[gameState.currentSkin] || SKINS[0];
-    this.ctx.fillStyle = skin.headColor;
-    this.ctx.fillText(`Skin: ${skin.name}`, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 90);
+    this.ctx.font = '16px Arial, sans-serif';
+    this.ctx.fillText('Press ENTER to play again', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 20);
+    this.ctx.fillText('Press M for menu', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 45);
   }
 
   clear() {

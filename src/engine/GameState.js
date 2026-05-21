@@ -9,24 +9,22 @@ import {
   MIN_DELAY,
 } from '../config.js';
 import { Snake } from './Snake.js';
+import { Food } from './Food.js';
+import { Obstacles } from './Obstacles.js';
+import { getRecord, setRecord } from '../storage.js';
 
 export class GameState {
   constructor() {
     this.state = STATES.MENU;
     this.currentLevel = 1;
     this.score = 0;
-    this.record = 0;
-    try {
-      const saved = localStorage.getItem('snake-record');
-      if (saved) this.record = parseInt(saved, 10) || 0;
-    } catch {
-      this.record = 0;
-    }
+    this.record = getRecord();
     this.currentSkin = 0;
     this.currentMap = 0;
     this.snakes = [];
     this.delay = INITIAL_DELAY;
-    this.obstacles = [];
+    this.food = new Food();
+    this.obstacles = new Obstacles();
   }
 
   init1P() {
@@ -35,7 +33,8 @@ export class GameState {
     this.score = 0;
     this.currentLevel = 1;
     this.delay = INITIAL_DELAY;
-    this.obstacles = [];
+    this.obstacles.generate(1, this.currentMap);
+    this.food.spawn(this.snakes, this.obstacles.positions, CANVAS_WIDTH, CANVAS_HEIGHT);
   }
 
   init2P() {
@@ -47,7 +46,8 @@ export class GameState {
     this.score = 0;
     this.currentLevel = 1;
     this.delay = INITIAL_DELAY;
-    this.obstacles = [];
+    this.obstacles.generate(1, this.currentMap);
+    this.food.spawn(this.snakes, this.obstacles.positions, CANVAS_WIDTH, CANVAS_HEIGHT);
   }
 
   tick(actions = []) {
@@ -68,6 +68,19 @@ export class GameState {
     // Move snakes
     for (const snake of this.snakes) {
       if (snake.alive) snake.move();
+    }
+
+    // Check food collisions
+    const heads = this.snakes.map((s) => s.headPosition());
+    const eatenIndex = this.food.checkEaten(heads);
+    if (eatenIndex >= 0) {
+      const snake = this.snakes[eatenIndex];
+      if (snake && snake.alive) {
+        this.score += this.food.value;
+        snake.grow(1);
+        this.updateLevel();
+        this.food.spawn(this.snakes, this.obstacles.positions, CANVAS_WIDTH, CANVAS_HEIGHT);
+      }
     }
 
     // Check collisions
@@ -113,7 +126,8 @@ export class GameState {
       }
 
       // Obstacle collision
-      for (const obs of this.obstacles) {
+      const obsList = this.obstacles.positions;
+      for (const obs of obsList) {
         if (head.x === obs.x && head.y === obs.y) {
           snake.alive = false;
           if (is2P && this.snakes.every((s) => !s.alive)) {
@@ -174,11 +188,7 @@ export class GameState {
     this.state = STATES.GAME_OVER;
     if (this.score > this.record) {
       this.record = this.score;
-      try {
-        localStorage.setItem('snake-record', String(this.record));
-      } catch {
-        // ignore storage errors
-      }
+      setRecord(this.record);
     }
   }
 
@@ -190,7 +200,7 @@ export class GameState {
         MIN_DELAY,
         INITIAL_DELAY - (this.currentLevel - 1) * SPEED_DECREASE
       );
-      // Obstacle regeneration placeholder for Phase 2
+      this.obstacles.generate(this.currentLevel, this.currentMap);
     }
   }
 
@@ -241,5 +251,17 @@ export class GameState {
 
   getDelay() {
     return this.delay;
+  }
+
+  getRecord() {
+    return this.record;
+  }
+
+  getFood() {
+    return this.food;
+  }
+
+  getObstacles() {
+    return this.obstacles.positions;
   }
 }

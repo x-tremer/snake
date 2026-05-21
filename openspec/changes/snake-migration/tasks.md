@@ -8,12 +8,12 @@
 | 400-line budget risk | High |
 | Chained PRs recommended | Yes |
 | Suggested split | PR 1: Scaffold + Core Engine / PR 2: Single-Player / PR 3: 2P + Tests / PR 4: PWA + Mobile + Polish |
-| Delivery strategy | auto-forecast |
-| Chain strategy | pending |
+| Delivery strategy | auto-chain |
+| Chain strategy | feature-branch-chain |
 
-Decision needed before apply: Yes
+Decision needed before apply: No
 Chained PRs recommended: Yes
-Chain strategy: pending
+Chain strategy: feature-branch-chain
 400-line budget risk: High
 
 ### Suggested Work Units
@@ -21,9 +21,9 @@ Chain strategy: pending
 | Unit | Goal | Likely PR | Notes |
 |------|------|-----------|-------|
 | 1 | Project scaffold + core engine + renderer + keyboard | PR 1 | Base branch `main` |
-| 2 | Single-player (food, score, levels, obstacles, skins, record, menus) | PR 2 | Targets PR 1 branch |
-| 3 | Two-player local mode + unit & Playwright tests | PR 3 | Targets PR 2 branch |
-| 4 | PWA + Capacitor + touch + responsive + polish | PR 4 | Targets PR 3 branch |
+| 2 | Single-player (food, score, levels, obstacles, skins, record, menus) | PR 2 | Targets branch `snake-migration-pr1` |
+| 3 | Two-player local mode + unit & Playwright tests | PR 3 | Targets branch `snake-migration-pr2` |
+| 4 | PWA + Capacitor + touch + responsive + polish | PR 4 | Targets branch `snake-migration-pr3` |
 
 ---
 
@@ -66,52 +66,52 @@ Chain strategy: pending
 
 ## Phase 2: Single-Player Mode
 
-- [ ] **T008** — Create Food module (position, type config, spawn on unoccupied cell, eat detection).
+- [x] **T008** — Create Food module (position, type config, spawn on unoccupied cell, eat detection).
   Files: `src/engine/Food.js`.
   Acceptance: food avoids occupied; eating increments score and grows snake.
   Depends: T003, T005.
 
-- [ ] **T009** — Create Obstacles module (4 map presets + level-based extra generation).
+- [x] **T009** — Create Obstacles module (4 map presets + level-based extra generation).
   Files: `src/engine/Obstacles.js`.
   Acceptance: maps load per spec; collision triggers `gameOver`.
   Depends: T003.
 
-- [ ] **T010** — Implement level progression + speed ramp (every 5 pts; delay formula `max(0.05, 0.12 - (level-1)*0.01)`).
+- [x] **T010** — Implement level progression + speed ramp (every 5 pts; delay formula `max(0.05, 0.12 - (level-1)*0.01)`).
   Files: `src/engine/GameState.js`.
   Acceptance: level increases; delay clamps at min; obstacles update.
   Depends: T008, T009.
 
-- [ ] **T011** — Create skin-aware snake renderer and food renderer (colored segments, distinct head, food circle + leaf accent).
+- [x] **T011** — Create skin-aware snake renderer and food renderer (colored segments, distinct head, food circle + leaf accent).
   Files: `src/renderer/drawSnake.js`, `src/renderer/drawFood.js`.
   Acceptance: 4 palettes render correctly; food types visually distinct.
   Depends: T006, T008.
 
-- [ ] **T012** — Create HUD renderer (score, record, level, skin name overlay).
+- [x] **T012** — Create HUD renderer (score, record, level, skin name overlay).
   Files: `src/renderer/drawHUD.js`.
   Acceptance: HUD shows accurate data during play.
   Depends: T010.
 
-- [ ] **T013** — Create Menu renderer (1P/2P selection, skin/map cycling).
+- [x] **T013** — Create Menu renderer (1P/2P selection, skin/map cycling).
   Files: `src/renderer/drawMenu.js`.
   Acceptance: screens render; selections update `config.js` values.
   Depends: T012.
 
-- [ ] **T014** — Create localStorage record persistence wrapper (`snake-record`).
+- [x] **T014** — Create localStorage record persistence wrapper (`snake-record`).
   Files: `src/storage.js`.
   Acceptance: record loads on boot; writes when beaten.
   Depends: T001.
 
-- [ ] **T015** — Implement pause/resume overlay rendering.
+- [x] **T015** — Implement pause/resume overlay rendering.
   Files: `src/renderer/CanvasRenderer.js`.
   Acceptance: P toggles overlay and freezes game.
   Depends: T005, T007.
 
-- [ ] **T016** — Write Vitest unit tests for engine logic (Grid, Snake, Food, GameState, Obstacles).
+- [x] **T016** — Write Vitest unit tests for engine logic (Grid, Snake, Food, GameState, Obstacles).
   Files: `tests/unit/*.test.js`.
   Acceptance: `npm run test` passes.
   Depends: T003, T004, T005, T008, T009.
 
-- [ ] **T017** — Write Playwright smoke test (page loads, canvas visible, keyboard input triggers action).
+- [x] **T017** — Write Playwright smoke test (page loads, canvas visible, keyboard input triggers action).
   Files: `tests/e2e/canvas.spec.js`.
   Acceptance: `npx playwright test` passes.
   Depends: T006, T007.

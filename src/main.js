@@ -48,6 +48,11 @@ keyboard.onAction((action) => {
 
 keyboard.setup();
 
+// Expose for E2E testing
+if (typeof window !== 'undefined') {
+  window.gameState = gameState;
+}
+
 let lastTime = 0;
 let accumulator = 0;
 
