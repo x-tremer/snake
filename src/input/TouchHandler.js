@@ -1,8 +1,9 @@
-import { STATES, DIRECTIONS } from '../config.js';
+import { DIRECTIONS, STATES } from '../config.js';
 
 /**
- * TouchHandler — swipe detection + on-screen D-pad for mobile devices.
- * Emits the same action types as KeyboardHandler so GameState needs no changes.
+ * TouchHandler — swipe detection + on-screen D-pad for mobile.
+ * Swipe anywhere on canvas to steer. D-pad is a visible fallback.
+ * Only shown during PLAYING states.
  */
 export class TouchHandler {
   constructor() {
@@ -10,9 +11,9 @@ export class TouchHandler {
     this._touchStartX = 0;
     this._touchStartY = 0;
     this._touchStartTime = 0;
-    this._swipeThreshold = 30; // pixels minimum for swipe
-    this._dpadVisible = false;
-    this._dpadButtons = [];
+    this._swipeThreshold = 25;
+    this._dpad = null;
+    this._currentState = null;
     this._setupDpad();
   }
 
@@ -23,11 +24,11 @@ export class TouchHandler {
     canvas.addEventListener('touchstart', this._onTouchStart.bind(this), { passive: false });
     canvas.addEventListener('touchend', this._onTouchEnd.bind(this), { passive: false });
     canvas.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
+  }
 
-    // Show d-pad only on touch-capable devices
-    if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
-      this._showDpad();
-    }
+  setState(state) {
+    this._currentState = state;
+    this._updateDpadVisibility();
   }
 
   onAction(callback) {
@@ -35,13 +36,12 @@ export class TouchHandler {
   }
 
   _emit(action) {
-    for (const cb of this.callbacks) {
-      cb(action);
-    }
+    for (const cb of this.callbacks) cb(action);
   }
 
   _onTouchStart(event) {
     event.preventDefault();
+    if (!event.touches.length) return;
     const touch = event.touches[0];
     this._touchStartX = touch.clientX;
     this._touchStartY = touch.clientY;
@@ -56,85 +56,107 @@ export class TouchHandler {
     const dy = touch.clientY - this._touchStartY;
     const dt = Date.now() - this._touchStartTime;
 
-    // Fast tap (< 300ms, small movement) → pause toggle
+    // Fast tap → pause toggle
     if (dt < 300 && Math.abs(dx) < 20 && Math.abs(dy) < 20) {
       this._emit({ type: 'PAUSE' });
       return;
     }
 
-    // Swipe detection: dominant axis wins
-    if (Math.abs(dx) < this._swipeThreshold && Math.abs(dy) < this._swipeThreshold) {
-      return; // too small, ignore
-    }
+    if (Math.abs(dx) < this._swipeThreshold && Math.abs(dy) < this._swipeThreshold) return;
 
-    let direction;
-    if (Math.abs(dx) > Math.abs(dy)) {
-      direction = dx > 0 ? DIRECTIONS.RIGHT : DIRECTIONS.LEFT;
-    } else {
-      direction = dy > 0 ? DIRECTIONS.DOWN : DIRECTIONS.UP;
-    }
+    const direction = Math.abs(dx) > Math.abs(dy)
+      ? (dx > 0 ? DIRECTIONS.RIGHT : DIRECTIONS.LEFT)
+      : (dy > 0 ? DIRECTIONS.DOWN : DIRECTIONS.UP);
 
     this._emit({ type: 'DIRECTION', direction, player: 1 });
   }
 
-  // --- On-screen D-pad ---
+  // --- D-pad ---
+
   _setupDpad() {
-    const container = document.createElement('div');
-    container.id = 'dpad';
-    container.style.cssText = `
-      position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
-      display: none; z-index: 100;
-      touch-action: none; -webkit-tap-highlight-color: transparent;
+    const dpad = document.createElement('div');
+    dpad.id = 'dpad';
+    dpad.innerHTML = `
+      <style>
+        #dpad {
+          position: fixed;
+          bottom: 24px;
+          left: 50%;
+          transform: translateX(-50%);
+          display: none;
+          z-index: 1000;
+          width: 240px;
+          height: 240px;
+          touch-action: none;
+          -webkit-tap-highlight-color: transparent;
+        }
+        #dpad button {
+          position: absolute;
+          width: 72px;
+          height: 72px;
+          border: 2px solid rgba(255,255,255,0.35);
+          border-radius: 14px;
+          background: rgba(255,255,255,0.10);
+          color: rgba(255,255,255,0.85);
+          font-size: 28px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          user-select: none;
+          -webkit-user-select: none;
+          transition: background 0.1s;
+        }
+        #dpad button:active {
+          background: rgba(50,205,50,0.35);
+          border-color: rgba(50,205,50,0.6);
+        }
+        #dpad .btn-up    { left: 84px; top: 0; }
+        #dpad .btn-left  { left: 0;    top: 84px; }
+        #dpad .btn-right { left: 168px;top: 84px; }
+        #dpad .btn-down  { left: 84px; top: 168px; }
+        #dpad .btn-enter {
+          left: 84px; top: 80px;
+          width: 72px; height: 80px;
+          border-radius: 40px;
+          background: rgba(50,205,50,0.25);
+          border-color: rgba(50,205,50,0.5);
+          font-size: 14px;
+          font-weight: bold;
+          letter-spacing: 1px;
+          color: #32cd32;
+        }
+        #dpad .btn-enter:active {
+          background: rgba(50,205,50,0.55);
+        }
+      </style>
+      <button class="btn-up"    data-action="UP">▲</button>
+      <button class="btn-left"  data-action="LEFT">◄</button>
+      <button class="btn-enter" data-action="PAUSE">⏯</button>
+      <button class="btn-right" data-action="RIGHT">►</button>
+      <button class="btn-down"  data-action="DOWN">▼</button>
     `;
-    document.body.appendChild(container);
+    document.body.appendChild(dpad);
 
-    const directions = [
-      { label: '▲', dir: DIRECTIONS.UP, x: 70, y: 10 },
-      { label: '◄', dir: DIRECTIONS.LEFT, x: 10, y: 70 },
-      { label: '►', dir: DIRECTIONS.RIGHT, x: 130, y: 70 },
-      { label: '▼', dir: DIRECTIONS.DOWN, x: 70, y: 130 },
-    ];
-
-    const btnStyle = `
-      width: 56px; height: 56px; border-radius: 10px; border: 2px solid #444;
-      background: rgba(255,255,255,0.08); color: #ccc; font-size: 22px;
-      display: flex; align-items: center; justify-content: center;
-      cursor: pointer; user-select: none;
-    `;
-
-    container.style.cssText += 'width: 200px; height: 200px; position: relative;';
-
-    for (const { label, dir, x, y } of directions) {
-      const btn = document.createElement('button');
-      btn.textContent = label;
-      btn.style.cssText = btnStyle + `position: absolute; left: ${x}px; top: ${y}px;`;
+    dpad.querySelectorAll('button').forEach(btn => {
+      const action = btn.dataset.action;
       btn.addEventListener('touchstart', (e) => {
         e.preventDefault();
         e.stopPropagation();
-        this._emit({ type: 'DIRECTION', direction: dir, player: 1 });
+        if (action === 'PAUSE') {
+          this._emit({ type: 'PAUSE' });
+        } else {
+          this._emit({ type: 'DIRECTION', direction: action, player: 1 });
+        }
       });
-      btn.addEventListener('mousedown', (e) => {
-        e.preventDefault();
-        this._emit({ type: 'DIRECTION', direction: dir, player: 1 });
-      });
-      container.appendChild(btn);
-      this._dpadButtons.push(btn);
-    }
+    });
 
-    this._dpadContainer = container;
+    this._dpad = dpad;
   }
 
-  _showDpad() {
-    if (this._dpadContainer) {
-      this._dpadContainer.style.display = 'block';
-      this._dpadVisible = true;
-    }
-  }
-
-  _hideDpad() {
-    if (this._dpadContainer) {
-      this._dpadContainer.style.display = 'none';
-      this._dpadVisible = false;
-    }
+  _updateDpadVisibility() {
+    if (!this._dpad) return;
+    const playing = this._currentState === STATES.PLAYING_1P || this._currentState === STATES.PLAYING_2P;
+    this._dpad.style.display = playing ? 'block' : 'none';
   }
 }

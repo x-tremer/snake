@@ -150,6 +150,7 @@ function gameLoop(timestamp) {
   lastTime = timestamp;
 
   const state = gameState.getState();
+  touch.setState(state);
 
   if (state === STATES.PLAYING_1P || state === STATES.PLAYING_2P) {
     accumulator += deltaTime;
