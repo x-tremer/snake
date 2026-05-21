@@ -1,11 +1,11 @@
 // Service Worker for Snake PWA — cache-first for app shell
 const CACHE_NAME = 'snake-v1';
 const ASSETS = [
-  '/',
-  '/index.html',
-  '/manifest.json',
-  '/icons/icon-192.svg',
-  '/icons/icon-512.svg',
+  './',
+  './index.html',
+  './manifest.json',
+  './icons/icon-192.svg',
+  './icons/icon-512.svg',
 ];
 
 self.addEventListener('install', (event) => {
@@ -25,8 +25,10 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // Network-first for non-assets, cache-first for app shell
-  if (ASSETS.includes(new URL(event.request.url).pathname)) {
+  const urlPath = new URL(event.request.url).pathname;
+  // Match relative asset paths against registered assets
+  const matched = ASSETS.some((a) => urlPath.endsWith(a.replace('./', '/')));
+  if (matched || urlPath === '/snake/' || urlPath === '/snake/index.html') {
     event.respondWith(
       caches.match(event.request).then((cached) => cached || fetch(event.request))
     );
