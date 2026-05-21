@@ -36,7 +36,9 @@ export class CanvasRenderer {
 
     const skin = SKINS[gameState.currentSkin] || SKINS[0];
     for (const snake of gameState.getSnakes()) {
-      drawSnake(this.ctx, snake, skin);
+      // Each snake uses its own skin index (important for 2P)
+      const snakeSkin = SKINS[snake.skinIndex] || skin;
+      drawSnake(this.ctx, snake, snakeSkin);
     }
 
     drawHUD(this.ctx, gameState);
@@ -47,7 +49,7 @@ export class CanvasRenderer {
     }
 
     if (state === STATES.GAME_OVER) {
-      this.drawGameOverOverlay();
+      this.drawGameOverOverlay(gameState);
       return;
     }
   }
@@ -72,18 +74,44 @@ export class CanvasRenderer {
     this.ctx.fillText('Press P to continue', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 30);
   }
 
-  drawGameOverOverlay() {
+  drawGameOverOverlay(gameState) {
     this.ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
     this.ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-    this.ctx.fillStyle = '#ff0000';
-    this.ctx.font = 'bold 28px Arial, sans-serif';
     this.ctx.textAlign = 'center';
     this.ctx.textBaseline = 'middle';
-    this.ctx.fillText('GAME OVER', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 20);
-    this.ctx.fillStyle = '#ffffff';
-    this.ctx.font = '16px Arial, sans-serif';
-    this.ctx.fillText('Press ENTER to play again', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 20);
-    this.ctx.fillText('Press M for menu', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 45);
+
+    const is2P = gameState.getMode() === 2;
+    const winner = gameState.getWinner();
+
+    if (is2P && winner) {
+      // 2P winner/loser display
+      let winnerText, winnerColor;
+      if (winner === 'p1') {
+        winnerText = 'Player 1 Wins!';
+        winnerColor = '#32cd32';
+      } else if (winner === 'p2') {
+        winnerText = 'Player 2 Wins!';
+        winnerColor = '#00bfff';
+      } else {
+        winnerText = 'Draw!';
+        winnerColor = '#ffd700';
+      }
+      this.ctx.fillStyle = winnerColor;
+      this.ctx.font = 'bold 28px Arial, sans-serif';
+      this.ctx.fillText(winnerText, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 30);
+
+      this.ctx.fillStyle = '#ffffff';
+      this.ctx.font = '16px Arial, sans-serif';
+      this.ctx.fillText('1 = Play again (1P) | 2 = Rematch (2P) | M = Menu', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 15);
+    } else {
+      this.ctx.fillStyle = '#ff0000';
+      this.ctx.font = 'bold 28px Arial, sans-serif';
+      this.ctx.fillText('GAME OVER', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 20);
+      this.ctx.fillStyle = '#ffffff';
+      this.ctx.font = '16px Arial, sans-serif';
+      this.ctx.fillText('Press ENTER to play again', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 20);
+      this.ctx.fillText('Press M for menu', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 45);
+    }
   }
 
   clear() {

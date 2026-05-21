@@ -18,6 +18,7 @@ export class GameState {
     this.state = STATES.MENU;
     this.currentLevel = 1;
     this.score = 0;
+    this.score2 = 0;
     this.record = getRecord();
     this.currentSkin = 0;
     this.currentMap = 0;
@@ -25,12 +26,17 @@ export class GameState {
     this.delay = INITIAL_DELAY;
     this.food = new Food();
     this.obstacles = new Obstacles();
+    this.mode = 1; // 1=1P, 2=2P
+    this.winner = null; // 'p1' | 'p2' | 'draw' | null
   }
 
   init1P() {
     this.snakes = [new Snake(this.currentSkin, 300, 300, 'right')];
     this.state = STATES.PLAYING_1P;
+    this.mode = 1;
+    this.winner = null;
     this.score = 0;
+    this.score2 = 0;
     this.currentLevel = 1;
     this.delay = INITIAL_DELAY;
     this.obstacles.generate(1, this.currentMap);
@@ -38,12 +44,16 @@ export class GameState {
   }
 
   init2P() {
+    const p2SkinIndex = 2; // Azul/cyan for P2
     this.snakes = [
-      new Snake(this.currentSkin, 200, 300, 'right'),
-      new Snake(this.currentSkin, 400, 300, 'left'),
+      new Snake(this.currentSkin, 180, 300, 'right'),   // grid(~9, 15) going RIGHT
+      new Snake(p2SkinIndex, 420, 300, 'left'),          // grid(~21, 15) going LEFT
     ];
     this.state = STATES.PLAYING_2P;
+    this.mode = 2;
+    this.winner = null;
     this.score = 0;
+    this.score2 = 0;
     this.currentLevel = 1;
     this.delay = INITIAL_DELAY;
     this.obstacles.generate(1, this.currentMap);
@@ -76,7 +86,17 @@ export class GameState {
     if (eatenIndex >= 0) {
       const snake = this.snakes[eatenIndex];
       if (snake && snake.alive) {
-        this.score += this.food.value;
+        const points = this.food.value;
+        if (this.mode === 2) {
+          // Separate scores for 2P
+          if (eatenIndex === 0) {
+            this.score += points;
+          } else {
+            this.score2 += points;
+          }
+        } else {
+          this.score += points;
+        }
         snake.grow(1);
         this.updateLevel();
         this.food.spawn(this.snakes, this.obstacles.positions, CANVAS_WIDTH, CANVAS_HEIGHT);
@@ -110,8 +130,10 @@ export class GameState {
         head.y >= CANVAS_HEIGHT - 10 - GRID_SIZE
       ) {
         snake.alive = false;
-        if (is2P && this.snakes.every((s) => !s.alive)) {
-          return { type: 'draw', snakeIndex: i };
+        if (is2P) {
+          const otherAlive = this.snakes[1 - i].alive;
+          if (!otherAlive) return { type: 'draw', snakeIndex: i, winnerIndex: null };
+          return { type: 'border', snakeIndex: i, winnerIndex: 1 - i };
         }
         return { type: 'border', snakeIndex: i };
       }
@@ -119,8 +141,10 @@ export class GameState {
       // Self collision
       if (snake.checkSelfCollision()) {
         snake.alive = false;
-        if (is2P && this.snakes.every((s) => !s.alive)) {
-          return { type: 'draw', snakeIndex: i };
+        if (is2P) {
+          const otherAlive = this.snakes[1 - i].alive;
+          if (!otherAlive) return { type: 'draw', snakeIndex: i, winnerIndex: null };
+          return { type: 'self', snakeIndex: i, winnerIndex: 1 - i };
         }
         return { type: 'self', snakeIndex: i };
       }
@@ -130,8 +154,10 @@ export class GameState {
       for (const obs of obsList) {
         if (head.x === obs.x && head.y === obs.y) {
           snake.alive = false;
-          if (is2P && this.snakes.every((s) => !s.alive)) {
-            return { type: 'draw', snakeIndex: i };
+          if (is2P) {
+            const otherAlive = this.snakes[1 - i].alive;
+            if (!otherAlive) return { type: 'draw', snakeIndex: i, winnerIndex: null };
+            return { type: 'obstacle', snakeIndex: i, winnerIndex: 1 - i };
           }
           return { type: 'obstacle', snakeIndex: i };
         }
@@ -139,7 +165,7 @@ export class GameState {
 
       // Opponent collision (2P only)
       if (is2P) {
-        const opponentIndex = i === 0 ? 1 : 0;
+        const opponentIndex = 1 - i;
         const opponent = this.snakes[opponentIndex];
         if (opponent && opponent.alive) {
           // Head-to-head
@@ -155,9 +181,6 @@ export class GameState {
           for (const seg of opponent.segments) {
             if (head.x === seg.x && head.y === seg.y) {
               snake.alive = false;
-              if (this.snakes.every((s) => !s.alive)) {
-                return { type: 'draw', snakeIndex: i };
-              }
               return { type: 'opponent', snakeIndex: i, winnerIndex: opponentIndex };
             }
           }
@@ -169,31 +192,30 @@ export class GameState {
   }
 
   handleDeath(result) {
-    if (result.type === 'headToHead') {
-      this.state = STATES.GAME_OVER;
-      return;
-    }
-    if (result.type === 'draw') {
-      this.state = STATES.GAME_OVER;
-      return;
-    }
-    if (this.state === STATES.PLAYING_2P) {
-      const winnerIndex = result.winnerIndex;
-      if (winnerIndex !== undefined && winnerIndex !== null) {
-        // One snake died, the other wins
-        this.state = STATES.GAME_OVER;
-        return;
+    const is2P = this.state === STATES.PLAYING_2P;
+    this.state = STATES.GAME_OVER;
+
+    if (is2P) {
+      if (result.type === 'headToHead' || result.type === 'draw') {
+        this.winner = 'draw';
+      } else if (result.winnerIndex === 0) {
+        this.winner = 'p1';
+      } else if (result.winnerIndex === 1) {
+        this.winner = 'p2';
       }
     }
-    this.state = STATES.GAME_OVER;
-    if (this.score > this.record) {
-      this.record = this.score;
+
+    // Always persist best score as record
+    const bestScore = is2P ? Math.max(this.score, this.score2) : this.score;
+    if (bestScore > this.record) {
+      this.record = bestScore;
       setRecord(this.record);
     }
   }
 
   updateLevel() {
-    const nextLevel = Math.floor(this.score / POINTS_PER_LEVEL) + 1;
+    const totalScore = this.mode === 2 ? this.score + this.score2 : this.score;
+    const nextLevel = Math.floor(totalScore / POINTS_PER_LEVEL) + 1;
     if (nextLevel > this.currentLevel) {
       this.currentLevel = nextLevel;
       this.delay = Math.max(
@@ -218,10 +240,10 @@ export class GameState {
   }
 
   restart() {
-    if (this.state === STATES.PLAYING_1P || this._previousState === STATES.PLAYING_1P) {
-      this.init1P();
-    } else if (this.state === STATES.PLAYING_2P || this._previousState === STATES.PLAYING_2P) {
+    if (this.mode === 2 || this._previousState === STATES.PLAYING_2P) {
       this.init2P();
+    } else {
+      this.init1P();
     }
   }
 
@@ -247,6 +269,18 @@ export class GameState {
 
   getScore() {
     return this.score;
+  }
+
+  getScore2() {
+    return this.score2;
+  }
+
+  getMode() {
+    return this.mode;
+  }
+
+  getWinner() {
+    return this.winner;
   }
 
   getDelay() {

@@ -118,17 +118,17 @@ Chain strategy: feature-branch-chain
 
 ## Phase 3: Two-Player Local Mode
 
-- [ ] **T018** — Extend Snake/GameState for 2P spawn (P1 left-center inward, P2 right-center inward) and dual collision.
+- [x] **T018** — Extend Snake/GameState for 2P spawn (P1 left-center inward, P2 right-center inward) and dual collision.
   Files: `src/engine/GameState.js`, `src/engine/Snake.js`.
   Acceptance: both snakes spawn correctly; border/self/opponent-body collision ends game.
   Depends: T004, T005.
 
-- [ ] **T019** — Extend HUD and GameState for 2P (separate scores, win/draw detection, head-to-head draw handling).
+- [x] **T019** — Extend HUD and GameState for 2P (separate scores, win/draw detection, head-to-head draw handling).
   Files: `src/renderer/drawHUD.js`, `src/engine/GameState.js`.
   Acceptance: HUD shows both scores; simultaneous death = draw.
   Depends: T012, T018.
 
-- [ ] **T020** — Add WASD input mapping for Player 2 with independent direction lock.
+- [x] **T020** — Add WASD input mapping for Player 2 with independent direction lock.
   Files: `src/input/KeyboardHandler.js`.
   Acceptance: WASD controls P2; reverse blocked per snake.
   Depends: T007, T018.

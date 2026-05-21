@@ -11,9 +11,9 @@ export function drawHUD(ctx, gameState) {
   ctx.textBaseline = 'top';
 
   let text;
-  if (gameState.getState() === 'PLAYING_2P') {
-    const scores = gameState.getSnakes().map((s, i) => `P${i + 1}: ${s.score || score}`);
-    text = `${scores.join('  ')}  Record: ${record}  Level: ${level}`;
+  if (gameState.getMode() === 2) {
+    const score2 = gameState.getScore2();
+    text = `P1: ${score}  P2: ${score2}  Record: ${record}  Level: ${level}`;
   } else {
     text = `Score: ${score}  Record: ${record}  Level: ${level}  Skin: ${skin.name}  Map: ${map.name}`;
   }
