@@ -104,6 +104,56 @@ touch.onAction(handleAction);
 keyboard.setup();
 touch.setup();
 
+// --- Mobile UI: login input + menu buttons ---
+const loginInput = document.getElementById('login-input');
+const loginSubmit = document.getElementById('login-submit');
+const menuButtons = document.getElementById('menu-buttons');
+
+function updateMobileUI() {
+  const state = gameState.getState();
+  const auth = gameState.authenticated;
+  const isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+
+  if (auth && state === STATES.MENU) {
+    if (isMobile) {
+      menuButtons.style.display = 'flex';
+      loginInput.style.display = 'none';
+      loginSubmit.style.display = 'none';
+    }
+  } else if (!auth && state === STATES.MENU) {
+    if (isMobile) {
+      loginInput.style.display = 'block';
+      loginSubmit.style.display = 'block';
+      menuButtons.style.display = 'none';
+      setTimeout(() => loginInput.focus(), 100);
+    }
+  } else {
+    menuButtons.style.display = 'none';
+    loginInput.style.display = 'none';
+    loginSubmit.style.display = 'none';
+  }
+}
+
+loginInput.addEventListener('input', () => {
+  loginCode = loginInput.value.toUpperCase().replace(/[^A-Z2-9-]/g, '');
+  gameState.loginCode = loginCode;
+});
+loginInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    handleAction({ type: 'LOGIN' });
+  }
+});
+loginSubmit.addEventListener('click', () => {
+  handleAction({ type: 'LOGIN' });
+});
+
+menuButtons.querySelectorAll('button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    handleAction({ type: btn.dataset.action });
+  });
+});
+
 // Responsive canvas sizing
 function resizeCanvas() {
   const maxW = window.innerWidth;
@@ -151,6 +201,7 @@ function gameLoop(timestamp) {
 
   const state = gameState.getState();
   touch.setState(state);
+  updateMobileUI();
 
   if (state === STATES.PLAYING_1P || state === STATES.PLAYING_2P) {
     accumulator += deltaTime;
