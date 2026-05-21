@@ -1,0 +1,36 @@
+schema: spec-driven
+
+context: |
+  Tech stack: Python 3 + turtle/Tkinter (current); HTML5 + Canvas + JS (target).
+  Architecture: Procedural single-file scripts; no modules or OOP.
+  Testing: No test framework detected. No pytest, unittest, or CI configs.
+  Style: Global state, Spanish identifiers, direct turtle rendering.
+  Persistence: record.txt (plain text; no serialization format).
+  Multiplayer: Socket-based LAN server/client with JSON protocol.
+  Migration target: HTML5 Canvas game with PWA support + Capacitor for mobile.
+
+rules:
+  proposal:
+    - Include rollback plan for risky changes
+    - Document feature parity matrix from Python versions to HTML5
+  specs:
+    - Use Given/When/Then for scenarios
+    - Use RFC 2119 keywords (MUST, SHALL, SHOULD, MAY)
+  design:
+    - Include architecture decision records for stack migration
+    - Document rendering and input mapping from Tkinter to Canvas
+  tasks:
+    - Group by phase (infrastructure, core loop, rendering, multiplayer, mobile)
+    - Keep tasks completable in one session
+  apply:
+    - Follow modern ES Module patterns for HTML5 target
+    - Preserve game logic but refactor from global-state to module-based
+    tdd: false
+    test_command: ""
+  verify:
+    test_command: ""
+    build_command: ""
+    coverage_threshold: 0
+  archive:
+    - Warn before merging destructive deltas
+    - Preserve Python source lineage in archive notes
