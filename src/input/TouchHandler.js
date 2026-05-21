@@ -1,9 +1,8 @@
 import { DIRECTIONS, STATES } from '../config.js';
+import { MENU_BUTTONS } from '../renderer/drawMenu.js';
 
 /**
- * TouchHandler — swipe detection + on-screen D-pad for mobile.
- * Swipe anywhere on canvas to steer. D-pad is a visible fallback.
- * Only shown during PLAYING states.
+ * TouchHandler — swipe + tap + D-pad for mobile.
  */
 export class TouchHandler {
   constructor() {
@@ -14,16 +13,19 @@ export class TouchHandler {
     this._swipeThreshold = 25;
     this._dpad = null;
     this._currentState = null;
+    this._canvas = null;
+    this._scaleX = 1;
+    this._scaleY = 1;
     this._setupDpad();
   }
 
   setup() {
-    const canvas = document.getElementById('game-canvas');
-    if (!canvas) return;
+    this._canvas = document.getElementById('game-canvas');
+    if (!this._canvas) return;
 
-    canvas.addEventListener('touchstart', this._onTouchStart.bind(this), { passive: false });
-    canvas.addEventListener('touchend', this._onTouchEnd.bind(this), { passive: false });
-    canvas.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
+    this._canvas.addEventListener('touchstart', this._onTouchStart.bind(this), { passive: false });
+    this._canvas.addEventListener('touchend', this._onTouchEnd.bind(this), { passive: false });
+    this._canvas.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
   }
 
   setState(state) {
@@ -37,6 +39,18 @@ export class TouchHandler {
 
   _emit(action) {
     for (const cb of this.callbacks) cb(action);
+  }
+
+  /** Convert clientX/clientY to canvas coordinates accounting for CSS scaling. */
+  _toCanvas(clientX, clientY) {
+    if (!this._canvas) return { x: 0, y: 0 };
+    const rect = this._canvas.getBoundingClientRect();
+    const scaleX = 600 / rect.width;   // CANVAS_WIDTH
+    const scaleY = 600 / rect.height;  // CANVAS_HEIGHT
+    return {
+      x: (clientX - rect.left) * scaleX,
+      y: (clientY - rect.top) * scaleY,
+    };
   }
 
   _onTouchStart(event) {
@@ -56,11 +70,33 @@ export class TouchHandler {
     const dy = touch.clientY - this._touchStartY;
     const dt = Date.now() - this._touchStartTime;
 
-    // Fast tap → pause toggle
+    // --- Fast tap ---
     if (dt < 300 && Math.abs(dx) < 20 && Math.abs(dy) < 20) {
-      this._emit({ type: 'PAUSE' });
+      // Menu: check if tap hit a button
+      if (this._currentState === STATES.MENU) {
+        const pos = this._toCanvas(touch.clientX, touch.clientY);
+        for (const btn of MENU_BUTTONS) {
+          if (pos.x >= btn.x && pos.x <= btn.x + btn.w &&
+              pos.y >= btn.y && pos.y <= btn.y + btn.h) {
+            this._emit({ type: btn.action });
+            return;
+          }
+        }
+        // Tap on code area → emit PAUSE to trigger login input focus in main.js
+        this._emit({ type: 'PAUSE' });
+        return;
+      }
+
+      // Playing: fast tap → pause
+      if (this._currentState === STATES.PLAYING_1P || this._currentState === STATES.PLAYING_2P) {
+        this._emit({ type: 'PAUSE' });
+        return;
+      }
       return;
     }
+
+    // --- Swipe (only during play) ---
+    if (this._currentState !== STATES.PLAYING_1P && this._currentState !== STATES.PLAYING_2P) return;
 
     if (Math.abs(dx) < this._swipeThreshold && Math.abs(dy) < this._swipeThreshold) return;
 
@@ -71,7 +107,7 @@ export class TouchHandler {
     this._emit({ type: 'DIRECTION', direction, player: 1 });
   }
 
-  // --- D-pad ---
+  // --- D-pad for playing ---
 
   _setupDpad() {
     const dpad = document.createElement('div');
@@ -80,7 +116,7 @@ export class TouchHandler {
       <style>
         #dpad {
           position: fixed;
-          bottom: 24px;
+          bottom: 16px;
           left: 50%;
           transform: translateX(-50%);
           display: none;

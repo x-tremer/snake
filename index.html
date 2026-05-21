@@ -76,49 +76,12 @@
       z-index: 1001;
       display: none;
     }
-    #menu-buttons {
-      position: fixed;
-      bottom: 20px;
-      left: 50%;
-      transform: translateX(-50%);
-      display: none;
-      z-index: 1000;
-      flex-wrap: wrap;
-      gap: 8px;
-      justify-content: center;
-      max-width: 300px;
-    }
-    #menu-buttons button {
-      padding: 12px 16px;
-      border: 2px solid rgba(255,255,255,0.3);
-      border-radius: 10px;
-      background: rgba(255,255,255,0.08);
-      color: #ccc;
-      font-size: 14px;
-      font-weight: 600;
-      cursor: pointer;
-      user-select: none;
-      -webkit-user-select: none;
-    }
-    #menu-buttons button:active {
-      background: rgba(50,205,50,0.35);
-      border-color: rgba(50,205,50,0.5);
-      color: #32cd32;
-    }
-    #menu-buttons .btn-1p { border-color: rgba(50,205,50,0.4); }
-    #menu-buttons .btn-2p { border-color: rgba(0,191,255,0.4); }
   </style>
 </head>
 <body>
   <canvas id="game-canvas" width="600" height="600"></canvas>
   <input id="login-input" type="text" maxlength="12" placeholder="SNAKE-______" autocomplete="off" autocorrect="off" spellcheck="false" inputmode="text" />
   <button id="login-submit">Enter</button>
-  <div id="menu-buttons">
-    <button class="btn-1p" data-action="START_1P">1 Player</button>
-    <button class="btn-2p" data-action="START_2P">2 Players</button>
-    <button data-action="CYCLE_SKIN">🎨 Skin</button>
-    <button data-action="CYCLE_MAP">🗺️ Map</button>
-  </div>
   <script>
     // Register service worker for PWA offline support
     if ('serviceWorker' in navigator) {
