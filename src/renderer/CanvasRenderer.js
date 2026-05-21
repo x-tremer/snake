@@ -3,7 +3,7 @@ import { SKINS } from '../config.js';
 import { drawSnake } from './drawSnake.js';
 import { drawFood } from './drawFood.js';
 import { drawHUD } from './drawHUD.js';
-import { drawMenu } from './drawMenu.js';
+import { drawGameOverButtons, drawMenu } from './drawMenu.js';
 import { ParticleSystem } from './particles.js';
 
 export class CanvasRenderer {
@@ -83,10 +83,10 @@ export class CanvasRenderer {
     this.ctx.font = 'bold 28px Arial, sans-serif';
     this.ctx.textAlign = 'center';
     this.ctx.textBaseline = 'middle';
-    this.ctx.fillText('PAUSED', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2);
+    this.ctx.fillText('PAUSED', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 10);
     this.ctx.fillStyle = '#ffffff';
-    this.ctx.font = '16px Arial, sans-serif';
-    this.ctx.fillText('Press P to continue', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 30);
+    this.ctx.font = '14px Arial, sans-serif';
+    this.ctx.fillText('Tap or press P to continue', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 25);
   }
 
   drawGameOverOverlay(gameState) {
@@ -113,20 +113,21 @@ export class CanvasRenderer {
       }
       this.ctx.fillStyle = winnerColor;
       this.ctx.font = 'bold 28px Arial, sans-serif';
-      this.ctx.fillText(winnerText, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 30);
+      this.ctx.fillText(winnerText, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 170);
 
       this.ctx.fillStyle = '#ffffff';
       this.ctx.font = '16px Arial, sans-serif';
-      this.ctx.fillText('1 = Play again (1P) | 2 = Rematch (2P) | M = Menu', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 15);
+      this.ctx.fillText('Choose what to do next', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 130);
     } else {
       this.ctx.fillStyle = '#ff0000';
       this.ctx.font = 'bold 28px Arial, sans-serif';
-      this.ctx.fillText('GAME OVER', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 20);
+      this.ctx.fillText('GAME OVER', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 170);
       this.ctx.fillStyle = '#ffffff';
       this.ctx.font = '16px Arial, sans-serif';
-      this.ctx.fillText('Press ENTER to play again', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 20);
-      this.ctx.fillText('Press M for menu', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 45);
+      this.ctx.fillText(`Score: ${gameState.getScore()}  |  Record: ${gameState.getRecord()}`, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 130);
     }
+
+    drawGameOverButtons(this.ctx, gameState);
   }
 
   clear() {

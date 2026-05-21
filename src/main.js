@@ -54,7 +54,16 @@ function handleAction(action) {
       break;
     case ACTION_TYPES.PAUSE:
     case 'PAUSE':
+      if (gameState.getState() === STATES.MENU && !gameState.authenticated) {
+        loginInput?.focus();
+        return;
+      }
       gameState.togglePause();
+      break;
+    case 'FOCUS_LOGIN':
+      if (gameState.getState() === STATES.MENU && !gameState.authenticated) {
+        loginInput?.focus();
+      }
       break;
     case ACTION_TYPES.RESTART:
     case 'RESTART':
@@ -71,10 +80,12 @@ function handleAction(action) {
       break;
     case ACTION_TYPES.CYCLE_SKIN:
     case 'CYCLE_SKIN':
+      if (!gameState.authenticated) break;
       gameState.cycleSkin();
       break;
     case ACTION_TYPES.CYCLE_MAP:
     case 'CYCLE_MAP':
+      if (!gameState.authenticated) break;
       gameState.cycleMap();
       break;
     case ACTION_TYPES.LOGIN:
@@ -83,18 +94,29 @@ function handleAction(action) {
         saveCode(loginCode);
         gameState.authenticated = true;
         loginCode = '';
+        gameState.loginCode = '';
+        gameState.loginError = false;
+        if (loginInput) loginInput.value = '';
+      } else {
+        gameState.loginError = true;
       }
       break;
     }
     case ACTION_TYPES.LOGIN_CHAR:
     case 'LOGIN_CHAR':
-      if (loginCode.length < 12) loginCode += action.char;
+      if (/^[A-HJ-NP-Z2-9-]$/.test(action.char) && loginCode.length < 13) {
+        loginCode += action.char;
+      }
       gameState.loginCode = loginCode;
+      gameState.loginError = false;
+      if (loginInput) loginInput.value = loginCode;
       break;
     case ACTION_TYPES.LOGIN_BACKSPACE:
     case 'LOGIN_BACKSPACE':
       loginCode = loginCode.slice(0, -1);
       gameState.loginCode = loginCode;
+      gameState.loginError = false;
+      if (loginInput) loginInput.value = loginCode;
       break;
   }
 }
@@ -107,10 +129,12 @@ touch.setup();
 // --- Mobile UI: login input ---
 const loginInput = document.getElementById('login-input');
 const loginSubmit = document.getElementById('login-submit');
+let lastMobileUiKey = '';
 
 function updateMobileUI() {
   const state = gameState.getState();
   const auth = gameState.authenticated;
+  const uiKey = `${state}:${auth}`;
 
   if (!auth && state === STATES.MENU) {
     // Login screen: show code input
@@ -120,44 +144,43 @@ function updateMobileUI() {
     loginInput.style.display = 'none';
     loginSubmit.style.display = 'none';
   }
+
+  if (uiKey !== lastMobileUiKey) {
+    lastMobileUiKey = uiKey;
+    resizeCanvas();
+  }
 }
 
-// Tap on code area in canvas → focus the hidden input to open keyboard
-const _origTouchAction = handleAction;
-handleAction = function(action) {
-  if (action.type === 'PAUSE' && gameState.getState() === STATES.MENU && !gameState.authenticated) {
-    loginInput.focus();
-    return;
-  }
-  _origTouchAction(action);
-};
-
 loginInput.addEventListener('input', () => {
-  loginCode = loginInput.value.toUpperCase().replace(/[^A-Z2-9-]/g, '');
+  loginCode = loginInput.value.toUpperCase().replace(/[^A-HJ-NP-Z2-9-]/g, '').slice(0, 13);
+  loginInput.value = loginCode;
   gameState.loginCode = loginCode;
+  gameState.loginError = false;
 });
 loginInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') {
     e.preventDefault();
-    _origTouchAction({ type: 'LOGIN' });
+    handleAction({ type: 'LOGIN' });
   }
 });
 loginSubmit.addEventListener('click', () => {
-  _origTouchAction({ type: 'LOGIN' });
+  handleAction({ type: 'LOGIN' });
 });
 
 // Responsive canvas sizing
 function resizeCanvas() {
+  const controlsArea = document.getElementById('controls-area');
+  const controlsHeight = controlsArea ? controlsArea.offsetHeight : 0;
   const maxW = window.innerWidth;
-  const maxH = window.innerHeight;
+  const maxH = Math.max(240, window.innerHeight - controlsHeight - 16);
   const aspect = 1; // square canvas (600/600)
 
   let w, h;
   if (maxW / maxH > aspect) {
-    h = Math.min(maxH * 0.95, 600);
+    h = Math.min(maxH * 0.98, 600);
     w = h * aspect;
   } else {
-    w = Math.min(maxW * 0.95, 600);
+    w = Math.min(maxW * 0.96, 600);
     h = w / aspect;
   }
 

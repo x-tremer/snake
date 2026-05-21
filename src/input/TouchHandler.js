@@ -1,21 +1,21 @@
 import { DIRECTIONS, STATES } from '../config.js';
-import { MENU_BUTTONS } from '../renderer/drawMenu.js';
+import { MENU_BUTTONS, GAMEOVER_BUTTONS } from '../renderer/drawMenu.js';
 
 /**
- * TouchHandler — swipe + tap + D-pad for mobile.
+ * TouchHandler + Mouse click — unified input for desktop and mobile.
+ * Canvas-drawn buttons detected by coordinate hit-test.
+ * Swipe only during PLAYING states.
  */
 export class TouchHandler {
   constructor() {
     this.callbacks = [];
-    this._touchStartX = 0;
-    this._touchStartY = 0;
-    this._touchStartTime = 0;
+    this._startX = 0;
+    this._startY = 0;
+    this._startTime = 0;
     this._swipeThreshold = 25;
     this._dpad = null;
     this._currentState = null;
     this._canvas = null;
-    this._scaleX = 1;
-    this._scaleY = 1;
     this._setupDpad();
   }
 
@@ -23,176 +23,132 @@ export class TouchHandler {
     this._canvas = document.getElementById('game-canvas');
     if (!this._canvas) return;
 
-    this._canvas.addEventListener('touchstart', this._onTouchStart.bind(this), { passive: false });
-    this._canvas.addEventListener('touchend', this._onTouchEnd.bind(this), { passive: false });
+    // Touch
+    this._canvas.addEventListener('touchstart', this._onStart.bind(this), { passive: false });
+    this._canvas.addEventListener('touchend', this._onEnd.bind(this), { passive: false });
     this._canvas.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
+
+    // Mouse (desktop)
+    this._canvas.addEventListener('mousedown', this._onStart.bind(this));
+    this._canvas.addEventListener('mouseup', this._onEnd.bind(this));
   }
 
-  setState(state) {
-    this._currentState = state;
-    this._updateDpadVisibility();
-  }
+  setState(s) { this._currentState = s; this._updateDpad(); }
+  onAction(cb) { this.callbacks.push(cb); }
+  _emit(a) { for (const cb of this.callbacks) cb(a); }
 
-  onAction(callback) {
-    this.callbacks.push(callback);
-  }
-
-  _emit(action) {
-    for (const cb of this.callbacks) cb(action);
-  }
-
-  /** Convert clientX/clientY to canvas coordinates accounting for CSS scaling. */
-  _toCanvas(clientX, clientY) {
+  /** Client coords → canvas coords */
+  _toCanvas(cx, cy) {
     if (!this._canvas) return { x: 0, y: 0 };
-    const rect = this._canvas.getBoundingClientRect();
-    const scaleX = 600 / rect.width;   // CANVAS_WIDTH
-    const scaleY = 600 / rect.height;  // CANVAS_HEIGHT
+    const r = this._canvas.getBoundingClientRect();
     return {
-      x: (clientX - rect.left) * scaleX,
-      y: (clientY - rect.top) * scaleY,
+      x: (cx - r.left) * (600 / r.width),
+      y: (cy - r.top) * (600 / r.height),
     };
   }
 
-  _onTouchStart(event) {
-    event.preventDefault();
-    if (!event.touches.length) return;
-    const touch = event.touches[0];
-    this._touchStartX = touch.clientX;
-    this._touchStartY = touch.clientY;
-    this._touchStartTime = Date.now();
+  /** Hit-test a button list */
+  _hitTest(cx, cy, buttons) {
+    const p = this._toCanvas(cx, cy);
+    for (const b of buttons) {
+      if (p.x >= b.x && p.x <= b.x + b.w && p.y >= b.y && p.y <= b.y + b.h) {
+        return b;
+      }
+    }
+    return null;
   }
 
-  _onTouchEnd(event) {
-    event.preventDefault();
-    if (!event.changedTouches.length) return;
-    const touch = event.changedTouches[0];
-    const dx = touch.clientX - this._touchStartX;
-    const dy = touch.clientY - this._touchStartY;
-    const dt = Date.now() - this._touchStartTime;
+  _onStart(e) {
+    e.preventDefault();
+    const t = e.touches ? e.touches[0] : e;
+    if (!t) return;
+    this._startX = t.clientX;
+    this._startY = t.clientY;
+    this._startTime = Date.now();
+  }
 
-    // --- Fast tap ---
-    if (dt < 300 && Math.abs(dx) < 20 && Math.abs(dy) < 20) {
-      // Menu: check if tap hit a button
-      if (this._currentState === STATES.MENU) {
-        const pos = this._toCanvas(touch.clientX, touch.clientY);
-        for (const btn of MENU_BUTTONS) {
-          if (pos.x >= btn.x && pos.x <= btn.x + btn.w &&
-              pos.y >= btn.y && pos.y <= btn.y + btn.h) {
-            this._emit({ type: btn.action });
-            return;
-          }
-        }
-        // Tap on code area → emit PAUSE to trigger login input focus in main.js
-        this._emit({ type: 'PAUSE' });
-        return;
-      }
+  _onEnd(e) {
+    e.preventDefault();
+    const t = e.changedTouches ? e.changedTouches[0] : e;
+    if (!t) return;
+    const dx = t.clientX - this._startX;
+    const dy = t.clientY - this._startY;
+    const dt = Date.now() - this._startTime;
+    const s = this._currentState;
 
-      // Playing: fast tap → pause
-      if (this._currentState === STATES.PLAYING_1P || this._currentState === STATES.PLAYING_2P) {
-        this._emit({ type: 'PAUSE' });
-        return;
-      }
+    // --- Click / fast tap ---
+    const isClick = dt < 400 && Math.abs(dx) < 20 && Math.abs(dy) < 20;
+    const isTap = dt < 300 && Math.abs(dx) < 20 && Math.abs(dy) < 20;
+
+    // Menu buttons (click → action)
+    if (s === STATES.MENU && isClick) {
+      const b = this._hitTest(t.clientX, t.clientY, MENU_BUTTONS);
+      if (b) { this._emit({ type: b.action }); return; }
+      // Tap on login code area
+      this._emit({ type: 'FOCUS_LOGIN' });
       return;
     }
 
-    // --- Swipe (only during play) ---
-    if (this._currentState !== STATES.PLAYING_1P && this._currentState !== STATES.PLAYING_2P) return;
+    // Game-over buttons
+    if (s === STATES.GAME_OVER && isClick) {
+      const b = this._hitTest(t.clientX, t.clientY, GAMEOVER_BUTTONS);
+      if (b) { this._emit({ type: b.action }); return; }
+      return;
+    }
 
+    // Pause overlay: tap anywhere → unpause
+    if (s === STATES.PAUSED && isTap) {
+      this._emit({ type: 'PAUSE' });
+      return;
+    }
+
+    // Playing: fast tap → pause
+    if ((s === STATES.PLAYING_1P || s === STATES.PLAYING_2P) && isTap) {
+      this._emit({ type: 'PAUSE' });
+      return;
+    }
+
+    // Swipe (only during play)
+    if (s !== STATES.PLAYING_1P && s !== STATES.PLAYING_2P) return;
     if (Math.abs(dx) < this._swipeThreshold && Math.abs(dy) < this._swipeThreshold) return;
 
-    const direction = Math.abs(dx) > Math.abs(dy)
+    const dir = Math.abs(dx) > Math.abs(dy)
       ? (dx > 0 ? DIRECTIONS.RIGHT : DIRECTIONS.LEFT)
       : (dy > 0 ? DIRECTIONS.DOWN : DIRECTIONS.UP);
 
-    this._emit({ type: 'DIRECTION', direction, player: 1 });
+    this._emit({ type: 'DIRECTION', direction: dir, player: 1 });
   }
 
-  // --- D-pad for playing ---
-
+  // --- D-pad (outside canvas, no overlap) ---
   _setupDpad() {
-    const dpad = document.createElement('div');
-    dpad.id = 'dpad';
-    dpad.innerHTML = `
-      <style>
-        #dpad {
-          position: fixed;
-          bottom: 16px;
-          left: 50%;
-          transform: translateX(-50%);
-          display: none;
-          z-index: 1000;
-          width: 240px;
-          height: 240px;
-          touch-action: none;
-          -webkit-tap-highlight-color: transparent;
-        }
-        #dpad button {
-          position: absolute;
-          width: 72px;
-          height: 72px;
-          border: 2px solid rgba(255,255,255,0.35);
-          border-radius: 14px;
-          background: rgba(255,255,255,0.10);
-          color: rgba(255,255,255,0.85);
-          font-size: 28px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          cursor: pointer;
-          user-select: none;
-          -webkit-user-select: none;
-          transition: background 0.1s;
-        }
-        #dpad button:active {
-          background: rgba(50,205,50,0.35);
-          border-color: rgba(50,205,50,0.6);
-        }
-        #dpad .btn-up    { left: 84px; top: 0; }
-        #dpad .btn-left  { left: 0;    top: 84px; }
-        #dpad .btn-right { left: 168px;top: 84px; }
-        #dpad .btn-down  { left: 84px; top: 168px; }
-        #dpad .btn-enter {
-          left: 84px; top: 80px;
-          width: 72px; height: 80px;
-          border-radius: 40px;
-          background: rgba(50,205,50,0.25);
-          border-color: rgba(50,205,50,0.5);
-          font-size: 14px;
-          font-weight: bold;
-          letter-spacing: 1px;
-          color: #32cd32;
-        }
-        #dpad .btn-enter:active {
-          background: rgba(50,205,50,0.55);
-        }
-      </style>
-      <button class="btn-up"    data-action="UP">▲</button>
-      <button class="btn-left"  data-action="LEFT">◄</button>
-      <button class="btn-enter" data-action="PAUSE">⏯</button>
-      <button class="btn-right" data-action="RIGHT">►</button>
-      <button class="btn-down"  data-action="DOWN">▼</button>
-    `;
-    document.body.appendChild(dpad);
+    this._dpad = document.getElementById('dpad');
+    if (!this._dpad) {
+      // Create D-pad container if not in HTML
+      const d = document.createElement('div');
+      d.id = 'dpad';
+      d.style.display = 'none';
+      d.innerHTML = `▼ ▲ ◄ ► ⏯`.replace(/(.)/g, (ch, i) => {
+        const actions = { '▲': 'UP', '▼': 'DOWN', '◄': 'LEFT', '►': 'RIGHT', '⏯': 'PAUSE' };
+        const dir = actions[ch] || '';
+        return `<button data-action="${dir}" style="width:64px;height:64px;border:2px solid rgba(255,255,255,0.3);border-radius:14px;background:rgba(255,255,255,0.08);color:#ccc;font-size:26px;margin:4px;cursor:pointer;user-select:none">${ch}</button>`;
+      });
+      document.getElementById('app-shell')?.appendChild(d);
+      this._dpad = d;
+    }
 
-    dpad.querySelectorAll('button').forEach(btn => {
-      const action = btn.dataset.action;
-      btn.addEventListener('touchstart', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        if (action === 'PAUSE') {
-          this._emit({ type: 'PAUSE' });
-        } else {
-          this._emit({ type: 'DIRECTION', direction: action, player: 1 });
-        }
+    this._dpad?.querySelectorAll('button[data-action]').forEach(b => {
+      b.addEventListener('pointerdown', (ev) => {
+        ev.preventDefault();
+        const a = b.dataset.action;
+        if (!a) return;
+        this._emit(a === 'PAUSE' ? { type: 'PAUSE' } : { type: 'DIRECTION', direction: a, player: 1 });
       });
     });
-
-    this._dpad = dpad;
   }
 
-  _updateDpadVisibility() {
+  _updateDpad() {
     if (!this._dpad) return;
     const playing = this._currentState === STATES.PLAYING_1P || this._currentState === STATES.PLAYING_2P;
-    this._dpad.style.display = playing ? 'block' : 'none';
+    this._dpad.style.display = playing ? 'flex' : 'none';
   }
 }
